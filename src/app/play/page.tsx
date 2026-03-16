@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
-import { createClient, type Profile } from "@/lib/supabase";
+import type { Profile } from "@/lib/supabase";
 
 interface GameQuestion {
   id: string; text: string; options: string[]; points: number; order: number; answered: boolean;
@@ -19,7 +19,6 @@ type Screen = "auth" | "gate" | "playing" | "result" | "complete";
 
 export default function PlayPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<Screen>("auth");
   const [loading, setLoading] = useState(true);
@@ -68,47 +67,46 @@ export default function PlayPage() {
     if (screen === "gate" || screen === "playing") loadGame();
   }, [screen, loadGame]);
 
-  // Sign up or sign in with Supabase Auth
+  // Sign up or sign in via server API
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthLoading(true);
 
     try {
-      if (authMode === "register") {
-        const { error } = await supabase.auth.signUp({
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: authMode === "register" ? "register" : "login",
           email,
           password,
-          options: { data: { display_name: displayName || email.split("@")[0] } },
-        });
-        if (error) { setAuthError(error.message); setAuthLoading(false); return; }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) { setAuthError(error.message); setAuthLoading(false); return; }
+          displayName: displayName || email.split("@")[0],
+        }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setAuthError(data.error);
+        setAuthLoading(false);
+        return;
       }
 
-      // Fetch profile after auth
-      const res = await fetch("/api/auth");
-      const data = await res.json();
       if (data.profile) {
         setProfile(data.profile);
         setScreen("gate");
       } else {
-        // Profile might take a moment to be created by the trigger
-        await new Promise((r) => setTimeout(r, 1000));
-        const res2 = await fetch("/api/auth");
-        const data2 = await res2.json();
-        setProfile(data2.profile);
-        setScreen("gate");
+        setAuthError("Account created but profile not ready. Please try logging in.");
       }
-    } catch {
-      setAuthError("Something went wrong");
+    } catch (err) {
+      setAuthError("Network error — check your connection and try again.");
+      console.error("Auth error:", err);
     }
     setAuthLoading(false);
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth", { method: "DELETE" });
     setProfile(null);
     setScreen("auth");
   };
