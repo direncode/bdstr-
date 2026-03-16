@@ -38,13 +38,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name and password required" }, { status: 400 });
   }
 
-  // Generate a fake email from the name (Supabase Auth requires email)
-  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Generate a fake email using the Supabase project's own domain (guaranteed valid)
+  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "") || "player";
+  const supabaseDomain = new URL(url).hostname; // e.g. "abcdef.supabase.co"
 
   if (mode === "register") {
     // Use slug + random suffix to avoid collisions
     const suffix = Math.random().toString(36).slice(2, 8);
-    const fakeEmail = `${slug}_${suffix}@banditos-trivia.com`;
+    const fakeEmail = `${slug}.${suffix}@${supabaseDomain}`;
 
     const { data, error } = await supabase.auth.signUp({
       email: fakeEmail,
