@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 export async function GET(req: NextRequest) {
   const playerId = req.cookies.get("player_id")?.value;
 
-  const { data: state } = await supabase.from("game_state").select("*").eq("id", "singleton").single();
+  const { data: state } = await supabase.from("game_state").select("*").eq("id", "singleton").maybeSingle();
 
   if (!state?.is_unlocked) {
     return NextResponse.json({ unlocked: false, round: null, questions: [] });
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ unlocked: true, round: null, questions: [] });
   }
 
-  const { data: round } = await supabase.from("rounds").select("*").eq("id", state.active_round_id).single();
+  const { data: round } = await supabase.from("rounds").select("*").eq("id", state.active_round_id).maybeSingle();
   const { data: questions } = await supabase
     .from("questions")
     .select("*")
@@ -64,14 +64,14 @@ export async function POST(req: NextRequest) {
     .select("id, is_correct, points")
     .eq("player_id", playerId)
     .eq("question_id", questionId)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     return NextResponse.json({ error: "Already answered", isCorrect: existing.is_correct, points: existing.points });
   }
 
   // Get question
-  const { data: question } = await supabase.from("questions").select("*").eq("id", questionId).single();
+  const { data: question } = await supabase.from("questions").select("*").eq("id", questionId).maybeSingle();
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
   const isCorrect = letter === question.correct;
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
   // Update player points
   if (points > 0) {
-    const { data: player } = await supabase.from("players").select("total_points").eq("id", playerId).single();
+    const { data: player } = await supabase.from("players").select("total_points").eq("id", playerId).maybeSingle();
     await supabase
       .from("players")
       .update({ total_points: (player?.total_points || 0) + points })

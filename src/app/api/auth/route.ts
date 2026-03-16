@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-// POST /api/auth — login by name + PIN
+// POST /api/auth — login or register by name + PIN
 export async function POST(req: NextRequest) {
   try {
     const { name, pin, action } = await req.json();
@@ -9,7 +9,13 @@ export async function POST(req: NextRequest) {
     if (action === "register") {
       if (!name || name.length < 2) return NextResponse.json({ error: "Name too short" }, { status: 400 });
 
-      const { data: existing } = await supabase.from("players").select("id").eq("name", name).single();
+      // Check if name is taken (maybeSingle so it doesn't error on 0 rows)
+      const { data: existing } = await supabase
+        .from("players")
+        .select("id")
+        .eq("name", name)
+        .maybeSingle();
+
       if (existing) return NextResponse.json({ error: "Name taken, pick another" }, { status: 409 });
 
       const { data: player, error } = await supabase
@@ -18,7 +24,10 @@ export async function POST(req: NextRequest) {
         .select()
         .single();
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        console.error("Register error:", error);
+        return NextResponse.json({ error: "Could not create account: " + error.message }, { status: 500 });
+      }
 
       const res = NextResponse.json({ player });
       res.cookies.set("player_id", player.id, { httpOnly: true, sameSite: "lax", maxAge: 30 * 86400, path: "/" });
@@ -33,14 +42,20 @@ export async function POST(req: NextRequest) {
       .select("*")
       .eq("name", name)
       .eq("pin", pin || "1234")
-      .single();
+      .maybeSingle();
 
-    if (error || !player) return NextResponse.json({ error: "Wrong name or PIN" }, { status: 401 });
+    if (error) {
+      console.error("Login error:", error);
+      return NextResponse.json({ error: "Database error: " + error.message }, { status: 500 });
+    }
+
+    if (!player) return NextResponse.json({ error: "Wrong name or PIN" }, { status: 401 });
 
     const res = NextResponse.json({ player });
     res.cookies.set("player_id", player.id, { httpOnly: true, sameSite: "lax", maxAge: 30 * 86400, path: "/" });
     return res;
-  } catch {
+  } catch (err) {
+    console.error("Auth error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
@@ -50,7 +65,12 @@ export async function GET(req: NextRequest) {
   const playerId = req.cookies.get("player_id")?.value;
   if (!playerId) return NextResponse.json({ player: null });
 
-  const { data: player } = await supabase.from("players").select("*").eq("id", playerId).single();
+  const { data: player } = await supabase
+    .from("players")
+    .select("*")
+    .eq("id", playerId)
+    .maybeSingle();
+
   return NextResponse.json({ player: player || null });
 }
 

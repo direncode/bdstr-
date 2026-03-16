@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 async function isAdmin(req: NextRequest): Promise<boolean> {
   const playerId = req.cookies.get("player_id")?.value;
   if (!playerId) return false;
-  const { data } = await supabase.from("players").select("is_admin").eq("id", playerId).single();
+  const { data } = await supabase.from("players").select("is_admin").eq("id", playerId).maybeSingle();
   return data?.is_admin === true;
 }
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   if (body.action === "toggle-unlock") {
-    const { data: state } = await supabase.from("game_state").select("is_unlocked").eq("id", "singleton").single();
+    const { data: state } = await supabase.from("game_state").select("is_unlocked").eq("id", "singleton").maybeSingle();
     const newVal = !(state?.is_unlocked ?? false);
     await supabase.from("game_state").update({ is_unlocked: newVal, updated_at: new Date().toISOString() }).eq("id", "singleton");
     return NextResponse.json({ isUnlocked: newVal });
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "reset-answers") {
-    const { data: state } = await supabase.from("game_state").select("active_round_id").eq("id", "singleton").single();
+    const { data: state } = await supabase.from("game_state").select("active_round_id").eq("id", "singleton").maybeSingle();
     if (state?.active_round_id) {
       const { data: questions } = await supabase
         .from("questions")

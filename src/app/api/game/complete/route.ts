@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
   const playerId = req.cookies.get("player_id")?.value;
   if (!playerId) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
-  const { data: state } = await supabase.from("game_state").select("*").eq("id", "singleton").single();
+  const { data: state } = await supabase.from("game_state").select("*").eq("id", "singleton").maybeSingle();
   if (!state?.active_round_id) return NextResponse.json({ error: "No active round" }, { status: 400 });
 
   // Get questions for the round
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   if (maxStreak >= 5) bonusPoints += 15;
 
   // Update player
-  const { data: player } = await supabase.from("players").select("*").eq("id", playerId).single();
+  const { data: player } = await supabase.from("players").select("*").eq("id", playerId).maybeSingle();
   if (player) {
     await supabase
       .from("players")
