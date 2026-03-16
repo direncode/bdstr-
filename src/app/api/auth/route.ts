@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   if (mode === "register") {
     // Use slug + random suffix to avoid collisions
     const suffix = Math.random().toString(36).slice(2, 8);
-    const fakeEmail = `${slug}_${suffix}@banditos.local`;
+    const fakeEmail = `${slug}_${suffix}@banditos-trivia.com`;
 
     const { data, error } = await supabase.auth.signUp({
       email: fakeEmail,
