@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+
 async function getAdminSupabase() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -26,9 +28,9 @@ export async function GET() {
     supabase.from("questions").select("*").order("sort_order"),
   ]);
 
-  const roundsWithQ = (rounds || []).map((r) => ({
+  const roundsWithQ = (rounds || []).map((r: Record<string, unknown>) => ({
     ...r,
-    questions: (allQuestions || []).filter((q) => q.round_id === r.id),
+    questions: (allQuestions || []).filter((q: Record<string, unknown>) => q.round_id === r.id),
   }));
 
   return NextResponse.json({
@@ -61,9 +63,72 @@ export async function POST(req: Request) {
     if (state?.active_round_id) {
       const { data: questions } = await supabase.from("questions").select("id").eq("round_id", state.active_round_id);
       if (questions && questions.length > 0) {
-        await supabase.from("answers").delete().in("question_id", questions.map((q) => q.id));
+        await supabase.from("answers").delete().in("question_id", questions.map((q: Record<string, unknown>) => q.id));
       }
     }
+    return NextResponse.json({ ok: true });
+  }
+
+  // --- Round CRUD ---
+  if (body.action === "add-round") {
+    const { name, category } = body;
+    if (!name || !category) return NextResponse.json({ error: "Name and category required" }, { status: 400 });
+    const { data: maxOrder } = await supabase.from("rounds").select("sort_order").order("sort_order", { ascending: false }).limit(1).maybeSingle();
+    const nextOrder = ((maxOrder?.sort_order as number) ?? 0) + 1;
+    const { data, error: insertErr } = await supabase.from("rounds").insert({ name, category, sort_order: nextOrder }).select().maybeSingle();
+    if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    return NextResponse.json({ round: data });
+  }
+
+  if (body.action === "edit-round") {
+    const { roundId, name, category } = body;
+    if (!roundId) return NextResponse.json({ error: "roundId required" }, { status: 400 });
+    const { error: updateErr } = await supabase.from("rounds").update({ name, category }).eq("id", roundId);
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "delete-round") {
+    const { roundId } = body;
+    if (!roundId) return NextResponse.json({ error: "roundId required" }, { status: 400 });
+    const { error: delErr } = await supabase.from("rounds").delete().eq("id", roundId);
+    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // --- Question CRUD ---
+  if (body.action === "add-question") {
+    const { round_id, question, option_a, option_b, option_c, option_d, correct } = body;
+    if (!round_id || !question || !option_a || !option_b || !option_c || !option_d || !correct) {
+      return NextResponse.json({ error: "All fields required" }, { status: 400 });
+    }
+    const { data: maxOrder } = await supabase.from("questions").select("sort_order").eq("round_id", round_id).order("sort_order", { ascending: false }).limit(1).maybeSingle();
+    const nextOrder = ((maxOrder?.sort_order as number) ?? 0) + 1;
+    const { data, error: insertErr } = await supabase.from("questions").insert({
+      round_id, question, option_a, option_b, option_c, option_d, correct, sort_order: nextOrder,
+    }).select().maybeSingle();
+    if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    return NextResponse.json({ question: data });
+  }
+
+  if (body.action === "edit-question") {
+    const { questionId, ...fields } = body;
+    if (!questionId) return NextResponse.json({ error: "questionId required" }, { status: 400 });
+    const allowed = ["question", "option_a", "option_b", "option_c", "option_d", "correct", "round_id", "sort_order"];
+    const updates: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (fields[key] !== undefined) updates[key] = fields[key];
+    }
+    const { error: updateErr } = await supabase.from("questions").update(updates).eq("id", questionId);
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "delete-question") {
+    const { questionId } = body;
+    if (!questionId) return NextResponse.json({ error: "questionId required" }, { status: 400 });
+    const { error: delErr } = await supabase.from("questions").delete().eq("id", questionId);
+    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 

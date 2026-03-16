@@ -91,9 +91,31 @@ alter table game_state enable row level security;
 create policy "Anyone can view profiles" on profiles for select using (true);
 create policy "Users can update own profile" on profiles for update using (auth.uid() = id);
 
--- Rounds & Questions: public read
+-- Rounds & Questions: public read, admin write (via authenticated user check)
 create policy "Public read rounds" on rounds for select using (true);
 create policy "Public read questions" on questions for select using (true);
+
+-- Admin write policies for rounds
+create policy "Admin insert rounds" on rounds for insert with check (
+  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+);
+create policy "Admin update rounds" on rounds for update using (
+  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+);
+create policy "Admin delete rounds" on rounds for delete using (
+  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+);
+
+-- Admin write policies for questions
+create policy "Admin insert questions" on questions for insert with check (
+  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+);
+create policy "Admin update questions" on questions for update using (
+  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+);
+create policy "Admin delete questions" on questions for delete using (
+  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+);
 
 -- Answers: public read, authenticated users can insert their own
 create policy "Public read answers" on answers for select using (true);
