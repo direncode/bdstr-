@@ -21,6 +21,15 @@ export async function GET() {
 
 // POST /api/auth — sign up or sign in
 export async function POST(req: Request) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key || url.includes("placeholder")) {
+    return NextResponse.json({
+      error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel environment variables, then redeploy.",
+    }, { status: 500 });
+  }
+
   const supabase = await createServerSupabase();
   const body = await req.json();
   const { mode, email, password, displayName } = body;
