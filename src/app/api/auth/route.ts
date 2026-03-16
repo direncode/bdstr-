@@ -1,94 +1,88 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { getSession, setSession, clearSession, generateToken, hashPassword, verifyPassword } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/auth — get current user + profile
+// GET /api/auth — get current user profile
 export async function GET() {
-  const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) return NextResponse.json({ user: null, profile: null });
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  return NextResponse.json({ user, profile });
+  const profile = await getSession();
+  return NextResponse.json({ profile });
 }
 
-// POST /api/auth — sign up or sign in (name + password, no email needed)
+// POST /api/auth — register or login (username + password)
 export async function POST(req: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key || url.includes("placeholder")) {
-    return NextResponse.json({
-      error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your Vercel environment variables, then redeploy.",
-    }, { status: 500 });
-  }
-
   const supabase = await createServerSupabase();
-  const body = await req.json();
-  const { mode, name, password } = body;
+  const { mode, name, password } = await req.json();
 
-  if (!name || !password) {
+  if (!name?.trim() || !password) {
     return NextResponse.json({ error: "Name and password required" }, { status: 400 });
   }
 
-  // Generate a fake email using the Supabase project's own domain (guaranteed valid)
-  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "") || "player";
-  const supabaseDomain = new URL(url).hostname; // e.g. "abcdef.supabase.co"
+  const trimmedName = name.trim();
 
   if (mode === "register") {
-    // Use slug + random suffix to avoid collisions
-    const suffix = Math.random().toString(36).slice(2, 8);
-    const fakeEmail = `${slug}.${suffix}@${supabaseDomain}`;
-
-    const { data, error } = await supabase.auth.signUp({
-      email: fakeEmail,
-      password,
-      options: { data: { display_name: name } },
-    });
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-    // Wait briefly for the profile trigger, then fetch profile
-    let profile = null;
-    for (let i = 0; i < 3; i++) {
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", data.user?.id)
-        .maybeSingle();
-      if (p) { profile = p; break; }
-      await new Promise((r) => setTimeout(r, 500));
+    if (password.length < 4) {
+      return NextResponse.json({ error: "Password must be at least 4 characters" }, { status: 400 });
     }
 
-    return NextResponse.json({ user: data.user, profile });
+    // Check if name is taken
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("display_name", trimmedName)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ error: "That name is already taken" }, { status: 400 });
+    }
+
+    const token = generateToken();
+    const pwHash = await hashPassword(password);
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .insert({
+        display_name: trimmedName,
+        password_hash: pwHash,
+        session_token: token,
+      })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    await setSession(token);
+    return NextResponse.json({ profile });
   }
 
   if (mode === "login") {
-    // Look up the profile by display_name to find the auto-generated email
     const { data: profile } = await supabase
       .from("profiles")
       .select("*")
-      .eq("display_name", name)
+      .eq("display_name", trimmedName)
       .maybeSingle();
 
     if (!profile) {
-      return NextResponse.json({ error: "No account found with that name" }, { status: 400 });
+      return NextResponse.json({ error: "No account with that name" }, { status: 400 });
     }
 
-    // Sign in using the stored email
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: profile.email,
-      password,
-    });
-    if (error) return NextResponse.json({ error: "Wrong password" }, { status: 400 });
+    const valid = await verifyPassword(password, profile.password_hash);
+    if (!valid) {
+      return NextResponse.json({ error: "Wrong password" }, { status: 400 });
+    }
 
-    return NextResponse.json({ user: data.user, profile });
+    // Refresh session token
+    const token = generateToken();
+    await supabase
+      .from("profiles")
+      .update({ session_token: token })
+      .eq("id", profile.id);
+
+    await setSession(token);
+    return NextResponse.json({ profile });
   }
 
   return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
@@ -96,7 +90,14 @@ export async function POST(req: Request) {
 
 // DELETE /api/auth — sign out
 export async function DELETE() {
-  const supabase = await createServerSupabase();
-  await supabase.auth.signOut();
+  const profile = await getSession();
+  if (profile) {
+    const supabase = await createServerSupabase();
+    await supabase
+      .from("profiles")
+      .update({ session_token: null })
+      .eq("id", profile.id);
+  }
+  await clearSession();
   return NextResponse.json({ ok: true });
 }

@@ -2,37 +2,18 @@
 -- BANDITOS TRIVIA — Paste this into Supabase SQL Editor → RUN
 -- ============================================================
 
--- 1. PROFILES (linked to Supabase Auth users)
+-- 1. PROFILES (standalone — no Supabase Auth needed)
 create table if not exists profiles (
-  id uuid references auth.users on delete cascade primary key,
-  email text not null,
-  display_name text not null,
+  id uuid default gen_random_uuid() primary key,
+  display_name text not null unique,
+  password_hash text not null,
+  session_token text,
   is_admin boolean default false,
   total_points int default 0,
   games_played int default 0,
   best_streak int default 0,
   created_at timestamptz default now()
 );
-
--- Auto-create profile when a user signs up
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, display_name)
-  values (
-    new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1))
-  );
-  return new;
-end;
-$$ language plpgsql security definer;
-
--- Drop trigger if exists, then create
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
 
 -- 2. ROUNDS
 create table if not exists rounds (
@@ -42,7 +23,7 @@ create table if not exists rounds (
   sort_order int default 0
 );
 
--- 3. QUESTIONS (edit these in the Table Editor like a spreadsheet!)
+-- 3. QUESTIONS
 create table if not exists questions (
   id uuid default gen_random_uuid() primary key,
   round_id uuid references rounds(id) on delete cascade,
@@ -79,7 +60,8 @@ create table if not exists game_state (
 insert into game_state (id, is_unlocked) values ('singleton', false) on conflict do nothing;
 
 -- ============================================================
--- ROW LEVEL SECURITY
+-- ROW LEVEL SECURITY — Allow all operations via anon key
+-- (auth is handled by our app, not Supabase Auth)
 -- ============================================================
 alter table profiles enable row level security;
 alter table rounds enable row level security;
@@ -87,48 +69,12 @@ alter table questions enable row level security;
 alter table answers enable row level security;
 alter table game_state enable row level security;
 
--- Profiles: anyone can read, users can update their own
-create policy "Anyone can view profiles" on profiles for select using (true);
-create policy "Users can update own profile" on profiles for update using (auth.uid() = id);
-
--- Rounds & Questions: public read, admin write (via authenticated user check)
-create policy "Public read rounds" on rounds for select using (true);
-create policy "Public read questions" on questions for select using (true);
-
--- Admin write policies for rounds
-create policy "Admin insert rounds" on rounds for insert with check (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
-);
-create policy "Admin update rounds" on rounds for update using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
-);
-create policy "Admin delete rounds" on rounds for delete using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
-);
-
--- Admin write policies for questions
-create policy "Admin insert questions" on questions for insert with check (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
-);
-create policy "Admin update questions" on questions for update using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
-);
-create policy "Admin delete questions" on questions for delete using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
-);
-
--- Answers: public read, authenticated users can insert their own
-create policy "Public read answers" on answers for select using (true);
-create policy "Users can insert own answers" on answers for insert with check (auth.uid() = player_id);
-
--- Game state: public read, public update (for admin API)
-create policy "Public read game_state" on game_state for select using (true);
-create policy "Public update game_state" on game_state for update using (true);
-
--- Allow service role to manage everything (for admin operations)
-create policy "Service can insert profiles" on profiles for insert with check (true);
-create policy "Service can update profiles" on profiles for update using (true);
-create policy "Service can delete answers" on answers for delete using (true);
+-- Allow all operations (our server handles auth via session cookies)
+create policy "Allow all on profiles" on profiles for all using (true) with check (true);
+create policy "Allow all on rounds" on rounds for all using (true) with check (true);
+create policy "Allow all on questions" on questions for all using (true) with check (true);
+create policy "Allow all on answers" on answers for all using (true) with check (true);
+create policy "Allow all on game_state" on game_state for all using (true) with check (true);
 
 -- ============================================================
 -- SEED DATA
@@ -182,7 +128,6 @@ insert into questions (round_id, question, option_a, option_b, option_c, option_
   ('44444444-4444-4444-4444-444444444444', 'What is the traditional UNC cheer?', 'Go Pack Go!', 'Roll Tide!', 'Go Heels!', 'Charge On!', 'C', 7);
 
 -- ============================================================
--- IMPORTANT: After running this, go to Authentication → Settings:
---   1. Disable "Confirm email" (so players can sign up instantly)
---   2. Or keep it on if you want email verification
+-- To make yourself admin: go to Table Editor → profiles →
+-- set is_admin to true for your row
 -- ============================================================

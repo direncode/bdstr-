@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 async function getAdminSupabase() {
+  const profile = await getSession();
+  if (!profile) return { supabase: null, error: "Not logged in" };
+  if (!profile.is_admin) return { supabase: null, error: "Not admin" };
+
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { supabase: null, error: "Not logged in" };
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile?.is_admin) return { supabase: null, error: "Not admin" };
   return { supabase, error: null };
 }
 

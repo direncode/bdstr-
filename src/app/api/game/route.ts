@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { getSession } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
 
 // GET /api/game — game state + questions for active round
 export async function GET() {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const profile = await getSession();
 
   const { data: state } = await supabase
     .from("game_state")
@@ -34,14 +37,14 @@ export async function GET() {
 
   // Get user's existing answers
   let answeredIds: string[] = [];
-  if (user && questions) {
+  if (profile && questions) {
     const qIds = questions.map((q) => q.id);
     const { data: answers } = await supabase
       .from("answers")
       .select("question_id")
-      .eq("player_id", user.id)
+      .eq("player_id", profile.id)
       .in("question_id", qIds);
-    answeredIds = (answers || []).map((a) => a.question_id);
+    answeredIds = (answers || []).map((a) => a.question_id as string);
   }
 
   return NextResponse.json({
@@ -53,7 +56,7 @@ export async function GET() {
       options: [q.option_a, q.option_b, q.option_c, q.option_d],
       points: q.points,
       order: q.sort_order,
-      answered: answeredIds.includes(q.id),
+      answered: answeredIds.includes(q.id as string),
     })),
   });
 }
@@ -61,8 +64,8 @@ export async function GET() {
 // POST /api/game — submit answer
 export async function POST(req: Request) {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  const profile = await getSession();
+  if (!profile) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const { questionId, selected } = await req.json();
   const letter = ["A", "B", "C", "D"][selected];
@@ -72,7 +75,7 @@ export async function POST(req: Request) {
   const { data: existing } = await supabase
     .from("answers")
     .select("id, is_correct, points")
-    .eq("player_id", user.id)
+    .eq("player_id", profile.id)
     .eq("question_id", questionId)
     .maybeSingle();
 
@@ -93,7 +96,7 @@ export async function POST(req: Request) {
 
   // Save answer
   const { error: ansError } = await supabase.from("answers").insert({
-    player_id: user.id,
+    player_id: profile.id,
     question_id: questionId,
     selected: letter,
     is_correct: isCorrect,
@@ -107,17 +110,12 @@ export async function POST(req: Request) {
 
   // Update player points
   if (points > 0) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("total_points")
-      .eq("id", user.id)
-      .maybeSingle();
     await supabase
       .from("profiles")
-      .update({ total_points: (profile?.total_points || 0) + points })
-      .eq("id", user.id);
+      .update({ total_points: (profile.total_points || 0) + points })
+      .eq("id", profile.id);
   }
 
-  const correctIndex = ["A", "B", "C", "D"].indexOf(question.correct);
+  const correctIndex = ["A", "B", "C", "D"].indexOf(question.correct as string);
   return NextResponse.json({ isCorrect, points, correctAnswer: correctIndex });
 }

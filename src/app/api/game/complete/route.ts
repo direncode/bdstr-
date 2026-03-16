@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { getSession } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
 
 export async function POST() {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  const profile = await getSession();
+  if (!profile) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const { data: state } = await supabase
     .from("game_state")
@@ -25,13 +28,13 @@ export async function POST() {
   const { data: answers } = await supabase
     .from("answers")
     .select("*")
-    .eq("player_id", user.id)
+    .eq("player_id", profile.id)
     .in("question_id", qIds);
 
   const answerMap = new Map((answers || []).map((a) => [a.question_id, a]));
   const correctCount = (answers || []).filter((a) => a.is_correct).length;
   const totalQuestions = questions.length;
-  const totalPoints = (answers || []).reduce((sum, a) => sum + a.points, 0);
+  const totalPoints = (answers || []).reduce((sum, a) => sum + (a.points as number), 0);
 
   // Calculate streak
   let currentStreak = 0;
@@ -46,22 +49,14 @@ export async function POST() {
   if (correctCount === totalQuestions && totalQuestions > 0) bonusPoints = 25;
   if (maxStreak >= 5) bonusPoints += 15;
 
-  const { data: profile } = await supabase
+  await supabase
     .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profile) {
-    await supabase
-      .from("profiles")
-      .update({
-        total_points: profile.total_points + bonusPoints,
-        games_played: profile.games_played + 1,
-        best_streak: Math.max(profile.best_streak, maxStreak),
-      })
-      .eq("id", user.id);
-  }
+    .update({
+      total_points: (profile.total_points || 0) + bonusPoints,
+      games_played: (profile.games_played || 0) + 1,
+      best_streak: Math.max(profile.best_streak || 0, maxStreak),
+    })
+    .eq("id", profile.id);
 
   return NextResponse.json({
     correctCount, totalQuestions,

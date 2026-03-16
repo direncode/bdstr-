@@ -1,24 +1,9 @@
-import { createBrowserClient } from "@supabase/ssr";
-
-let cachedClient: ReturnType<typeof createBrowserClient> | null = null;
-
-export function createClient() {
-  if (cachedClient) return cachedClient;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    // During build/SSR without env vars, return a dummy that won't crash
-    return createBrowserClient("https://placeholder.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder");
-  }
-  cachedClient = createBrowserClient(url, key);
-  return cachedClient;
-}
-
 // Types matching our DB schema
 export interface Profile {
   id: string;
-  email: string;
   display_name: string;
+  password_hash: string;
+  session_token: string | null;
   is_admin: boolean;
   total_points: number;
   games_played: number;
