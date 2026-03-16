@@ -19,7 +19,7 @@ export async function GET() {
   return NextResponse.json({ user, profile });
 }
 
-// POST /api/auth — sign up or sign in
+// POST /api/auth — sign up or sign in (name + password, no email needed)
 export async function POST(req: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -32,17 +32,24 @@ export async function POST(req: Request) {
 
   const supabase = await createServerSupabase();
   const body = await req.json();
-  const { mode, email, password, displayName } = body;
+  const { mode, name, password } = body;
 
-  if (!email || !password) {
-    return NextResponse.json({ error: "Email and password required" }, { status: 400 });
+  if (!name || !password) {
+    return NextResponse.json({ error: "Name and password required" }, { status: 400 });
   }
 
+  // Generate a fake email from the name (Supabase Auth requires email)
+  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
   if (mode === "register") {
+    // Use slug + random suffix to avoid collisions
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const fakeEmail = `${slug}_${suffix}@banditos.local`;
+
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: fakeEmail,
       password,
-      options: { data: { display_name: displayName || email.split("@")[0] } },
+      options: { data: { display_name: name } },
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
@@ -62,14 +69,23 @@ export async function POST(req: Request) {
   }
 
   if (mode === "login") {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
+    // Look up the profile by display_name to find the auto-generated email
     const { data: profile } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", data.user.id)
+      .eq("display_name", name)
       .maybeSingle();
+
+    if (!profile) {
+      return NextResponse.json({ error: "No account found with that name" }, { status: 400 });
+    }
+
+    // Sign in using the stored email
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: profile.email,
+      password,
+    });
+    if (error) return NextResponse.json({ error: "Wrong password" }, { status: 400 });
 
     return NextResponse.json({ user: data.user, profile });
   }

@@ -25,7 +25,6 @@ export default function PlayPage() {
 
   // Auth
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
-  const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -79,9 +78,8 @@ export default function PlayPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: authMode === "register" ? "register" : "login",
-          email,
+          name: displayName.trim(),
           password,
-          displayName: displayName || email.split("@")[0],
         }),
       });
       const data = await res.json();
@@ -151,30 +149,25 @@ export default function PlayPage() {
         <div className="mt-8 w-full max-w-sm bg-white/10 backdrop-blur rounded-2xl p-6">
           <div className="flex gap-2 mb-6">
             <button onClick={() => setAuthMode("register")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "register" ? "bg-banditos-red text-white" : "text-white/60"}`}>
-              Sign Up
+              New Player
             </button>
             <button onClick={() => setAuthMode("login")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "login" ? "bg-banditos-red text-white" : "text-white/60"}`}>
-              Log In
+              Returning
             </button>
           </div>
 
           {authError && <p className="text-red-400 text-sm mb-3 text-center">{authError}</p>}
 
           <form onSubmit={handleAuth} className="space-y-3">
-            {authMode === "register" && (
-              <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Display name" autoFocus required
-                className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg" />
-            )}
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email" required autoFocus={authMode === "login"}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
+            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name" autoFocus required
+              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg" />
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password (min 6 chars)" required minLength={6}
+              placeholder="Password" required minLength={6}
               className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
-            <button type="submit" disabled={authLoading}
+            <button type="submit" disabled={authLoading || !displayName.trim()}
               className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50">
-              {authLoading ? "..." : authMode === "register" ? "CREATE ACCOUNT" : "LOG IN"}
+              {authLoading ? "..." : authMode === "register" ? "JOIN" : "LOG IN"}
             </button>
           </form>
         </div>
