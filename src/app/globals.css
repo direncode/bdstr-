@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Passion+One:wght@400;700;900&display=swap');
+
+:root {
+  --banditos-red: #C41E3A;
+  --banditos-gold: #FFD700;
+  --banditos-dark: #1A1A2E;
+  --banditos-cream: #FFF8E7;
+}
+
+body {
+  background: var(--banditos-cream);
+  color: var(--banditos-dark);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(196, 30, 58, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(196, 30, 58, 0.6); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
