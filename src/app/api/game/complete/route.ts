@@ -1,48 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
-// POST /api/game/complete — mark game complete, calculate streak/bonus
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
-  if (!token) return NextResponse.json({ error: "Login required" }, { status: 401 });
-  const session = verifyToken(token);
-  if (!session) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  const playerId = req.cookies.get("player_id")?.value;
+  if (!playerId) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
-  const state = await prisma.gameState.findUnique({ where: { id: "singleton" } });
-  if (!state?.activeRoundId) {
-    return NextResponse.json({ error: "No active round" }, { status: 400 });
-  }
+  const { data: state } = await supabase.from("game_state").select("*").eq("id", "singleton").single();
+  if (!state?.active_round_id) return NextResponse.json({ error: "No active round" }, { status: 400 });
 
-  // Get all user answers for this round
-  const round = await prisma.round.findUnique({
-    where: { id: state.activeRoundId },
-    include: { questions: true },
-  });
-  if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
+  // Get questions for the round
+  const { data: questions } = await supabase
+    .from("questions")
+    .select("id, sort_order")
+    .eq("round_id", state.active_round_id)
+    .order("sort_order");
 
-  const answers = await prisma.answer.findMany({
-    where: {
-      userId: session.userId,
-      questionId: { in: round.questions.map((q) => q.id) },
-    },
-  });
+  if (!questions) return NextResponse.json({ error: "No questions" }, { status: 400 });
 
-  const correctCount = answers.filter((a) => a.isCorrect).length;
-  const totalQuestions = round.questions.length;
-  const totalPoints = answers.reduce((sum, a) => sum + a.points, 0);
+  // Get player's answers
+  const qIds = questions.map((q) => q.id);
+  const { data: answers } = await supabase
+    .from("answers")
+    .select("*")
+    .eq("player_id", playerId)
+    .in("question_id", qIds);
 
-  // Calculate streak (consecutive correct answers)
-  const sortedAnswers = answers.sort((a, b) => {
-    const qA = round.questions.find((q) => q.id === a.questionId);
-    const qB = round.questions.find((q) => q.id === b.questionId);
-    return (qA?.order || 0) - (qB?.order || 0);
-  });
+  const answerMap = new Map((answers || []).map((a) => [a.question_id, a]));
 
+  const correctCount = (answers || []).filter((a) => a.is_correct).length;
+  const totalQuestions = questions.length;
+  const totalPoints = (answers || []).reduce((sum, a) => sum + a.points, 0);
+
+  // Calculate streak
   let currentStreak = 0;
   let maxStreak = 0;
-  for (const a of sortedAnswers) {
-    if (a.isCorrect) {
+  for (const q of questions) {
+    const a = answerMap.get(q.id);
+    if (a?.is_correct) {
       currentStreak++;
       maxStreak = Math.max(maxStreak, currentStreak);
     } else {
@@ -50,39 +44,22 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Bonus: perfect round
+  // Bonuses
   let bonusPoints = 0;
-  if (correctCount === totalQuestions && totalQuestions > 0) {
-    bonusPoints = 25;
-  }
-  // Bonus: 5+ streak
-  if (maxStreak >= 5) {
-    bonusPoints += 15;
-  }
+  if (correctCount === totalQuestions && totalQuestions > 0) bonusPoints = 25;
+  if (maxStreak >= 5) bonusPoints += 15;
 
-  if (bonusPoints > 0) {
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: {
-        totalPoints: { increment: bonusPoints },
-        gamesPlayed: { increment: 1 },
-        bestStreak: { increment: 0 }, // handled below
-      },
-    });
-  } else {
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: { gamesPlayed: { increment: 1 } },
-    });
-  }
-
-  // Update best streak
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
-  if (user && maxStreak > user.bestStreak) {
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: { bestStreak: maxStreak },
-    });
+  // Update player
+  const { data: player } = await supabase.from("players").select("*").eq("id", playerId).single();
+  if (player) {
+    await supabase
+      .from("players")
+      .update({
+        total_points: player.total_points + bonusPoints,
+        games_played: player.games_played + 1,
+        best_streak: Math.max(player.best_streak, maxStreak),
+      })
+      .eq("id", playerId);
   }
 
   return NextResponse.json({

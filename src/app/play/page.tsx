@@ -3,41 +3,30 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
-import { BusynessBar } from "@/components/BusynessBar";
 
-interface User { id: string; name: string; role: string; totalPoints?: number }
+interface Player { id: string; name: string; is_admin: boolean; total_points: number }
 interface GameQuestion {
-  id: string;
-  text: string;
-  options: string[];
-  points: number;
-  order: number;
-  answered: boolean;
+  id: string; text: string; options: string[]; points: number; order: number; answered: boolean;
 }
 interface RoundInfo { id: string; name: string; category: string }
 interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: number }
 interface GameComplete {
-  correctCount: number;
-  totalQuestions: number;
-  totalPoints: number;
-  bonusPoints: number;
-  maxStreak: number;
-  perfectRound: boolean;
+  correctCount: number; totalQuestions: number; totalPoints: number;
+  bonusPoints: number; maxStreak: number; perfectRound: boolean;
 }
 
 type Screen = "auth" | "gate" | "playing" | "result" | "complete";
 
 export default function PlayPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [player, setPlayer] = useState<Player | null>(null);
   const [screen, setScreen] = useState<Screen>("auth");
   const [loading, setLoading] = useState(true);
 
-  // Auth
+  // Auth (simple name + PIN)
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("1234");
   const [authError, setAuthError] = useState("");
 
   // Game
@@ -51,21 +40,14 @@ export default function PlayPage() {
   const [gameResult, setGameResult] = useState<GameComplete | null>(null);
   const [streak, setStreak] = useState(0);
 
-  // Check auth on load
   useEffect(() => {
     fetch("/api/auth")
       .then((r) => r.json())
-      .then((d) => {
-        if (d.user) {
-          setUser(d.user);
-          setScreen("gate");
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      .then((d) => { if (d.player) { setPlayer(d.player); setScreen("gate"); } })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  // Load game state when on gate
   const loadGame = useCallback(() => {
     fetch("/api/game")
       .then((r) => r.json())
@@ -73,9 +55,8 @@ export default function PlayPage() {
         setUnlocked(d.unlocked);
         setRound(d.round);
         setQuestions(d.questions || []);
-        // Find first unanswered question
-        const firstUnanswered = (d.questions || []).findIndex((q: GameQuestion) => !q.answered);
-        setCurrentIdx(firstUnanswered >= 0 ? firstUnanswered : 0);
+        const first = (d.questions || []).findIndex((q: GameQuestion) => !q.answered);
+        setCurrentIdx(first >= 0 ? first : 0);
       });
   }, []);
 
@@ -83,31 +64,24 @@ export default function PlayPage() {
     if (screen === "gate" || screen === "playing") loadGame();
   }, [screen, loadGame]);
 
-  // Auth submit
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
-    const body = authMode === "register"
-      ? { action: "register", email, name, password }
-      : { action: "login", email, password };
-
     const res = await fetch("/api/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ name, pin, action: authMode === "register" ? "register" : "login" }),
     });
     const data = await res.json();
     if (!res.ok) { setAuthError(data.error); return; }
-    setUser(data.user);
+    setPlayer(data.player);
     setScreen("gate");
   };
 
-  // Submit answer
   const submitAnswer = async (optionIdx: number) => {
     if (submitting || selected !== null) return;
     setSelected(optionIdx);
     setSubmitting(true);
-
     const res = await fetch("/api/game", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -115,25 +89,18 @@ export default function PlayPage() {
     });
     const data = await res.json();
     setResult(data);
-    if (data.isCorrect) setStreak((s) => s + 1);
-    else setStreak(0);
+    if (data.isCorrect) setStreak((s) => s + 1); else setStreak(0);
     setSubmitting(false);
     setScreen("result");
   };
 
-  // Next question
   const nextQuestion = () => {
     setSelected(null);
     setResult(null);
-    if (currentIdx < questions.length - 1) {
-      setCurrentIdx(currentIdx + 1);
-      setScreen("playing");
-    } else {
-      completeGame();
-    }
+    if (currentIdx < questions.length - 1) { setCurrentIdx(currentIdx + 1); setScreen("playing"); }
+    else { completeGame(); }
   };
 
-  // Complete game
   const completeGame = async () => {
     const res = await fetch("/api/game/complete", { method: "POST" });
     const data = await res.json();
@@ -141,33 +108,20 @@ export default function PlayPage() {
     setScreen("complete");
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-banditos-dark flex items-center justify-center">
-        <BanditosLogo size="md" />
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-banditos-dark flex items-center justify-center"><BanditosLogo size="md" /></div>;
 
-  // ============ AUTH SCREEN ============
+  // ============ AUTH ============
   if (screen === "auth") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="md" />
-
         <div className="mt-8 w-full max-w-sm bg-white/10 backdrop-blur rounded-2xl p-6">
           <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => setAuthMode("login")}
-              className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "login" ? "bg-banditos-red text-white" : "text-white/60"}`}
-            >
+            <button onClick={() => setAuthMode("login")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "login" ? "bg-banditos-red text-white" : "text-white/60"}`}>
               Login
             </button>
-            <button
-              onClick={() => setAuthMode("register")}
-              className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "register" ? "bg-banditos-red text-white" : "text-white/60"}`}
-            >
-              Sign Up
+            <button onClick={() => setAuthMode("register")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "register" ? "bg-banditos-red text-white" : "text-white/60"}`}>
+              New Player
             </button>
           </div>
 
@@ -175,41 +129,33 @@ export default function PlayPage() {
 
           <form onSubmit={handleAuth} className="space-y-3">
             <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-              placeholder="Email" className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none"
+              type="text" value={name} onChange={(e) => setName(e.target.value)} required
+              placeholder="Your name" autoFocus
+              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg"
             />
-            {authMode === "register" && (
-              <input
-                type="text" value={name} onChange={(e) => setName(e.target.value)} required
-                placeholder="Display name" className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none"
-              />
-            )}
             <input
-              type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
-              placeholder="Password" className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none"
+              type="text" value={pin} onChange={(e) => setPin(e.target.value)} required
+              placeholder="PIN (default: 1234)" maxLength={8} inputMode="numeric"
+              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none"
             />
             <button type="submit" className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors">
-              {authMode === "login" ? "Login" : "Create Account"}
+              {authMode === "login" ? "LET'S GO" : "JOIN"}
             </button>
           </form>
 
           <p className="text-white/30 text-xs text-center mt-4">
-            Demo: admin@banditos.com / admin123
+            Admin: Trivia Host / PIN: 0000
           </p>
         </div>
       </div>
     );
   }
 
-  // ============ GATE SCREEN (unlock check) ============
+  // ============ GATE ============
   if (screen === "gate") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="lg" />
-
-        <div className="mt-6 w-full max-w-sm">
-          <BusynessBar />
-        </div>
 
         <div className="mt-6 w-full max-w-sm">
           {!unlocked ? (
@@ -217,15 +163,8 @@ export default function PlayPage() {
               <div className="bg-white/10 backdrop-blur rounded-2xl p-8">
                 <span className="text-6xl">🔒</span>
                 <h2 className="text-white text-xl font-bold mt-4">Trivia is Locked</h2>
-                <p className="text-white/60 mt-2">
-                  Waiting for the host to start tonight&apos;s game. Hang tight!
-                </p>
-                <button
-                  onClick={loadGame}
-                  className="mt-4 text-banditos-gold text-sm hover:underline"
-                >
-                  Refresh
-                </button>
+                <p className="text-white/60 mt-2">Waiting for the host to start tonight&apos;s game!</p>
+                <button onClick={loadGame} className="mt-4 text-banditos-gold text-sm hover:underline">Refresh</button>
               </div>
             </div>
           ) : !round ? (
@@ -233,15 +172,8 @@ export default function PlayPage() {
               <div className="bg-white/10 backdrop-blur rounded-2xl p-8">
                 <span className="text-6xl">🌮</span>
                 <h2 className="text-white text-xl font-bold mt-4">Trivia is Open!</h2>
-                <p className="text-white/60 mt-2">
-                  Waiting for the host to pick a round...
-                </p>
-                <button
-                  onClick={loadGame}
-                  className="mt-4 text-banditos-gold text-sm hover:underline"
-                >
-                  Refresh
-                </button>
+                <p className="text-white/60 mt-2">Host is picking a round...</p>
+                <button onClick={loadGame} className="mt-4 text-banditos-gold text-sm hover:underline">Refresh</button>
               </div>
             </div>
           ) : (
@@ -264,12 +196,16 @@ export default function PlayPage() {
         </div>
 
         <div className="mt-6 flex gap-3">
-          <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">
-            Leaderboard
-          </button>
+          <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Leaderboard</button>
           <span className="text-white/20">|</span>
+          {player?.is_admin && (
+            <>
+              <button onClick={() => router.push("/admin")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Admin</button>
+              <span className="text-white/20">|</span>
+            </>
+          )}
           <button
-            onClick={async () => { await fetch("/api/auth", { method: "DELETE" }); setUser(null); setScreen("auth"); }}
+            onClick={async () => { await fetch("/api/auth", { method: "DELETE" }); setPlayer(null); setScreen("auth"); }}
             className="text-white/40 text-sm hover:text-white/60"
           >
             Logout
@@ -279,14 +215,13 @@ export default function PlayPage() {
     );
   }
 
-  // ============ PLAYING SCREEN ============
+  // ============ PLAYING / RESULT ============
   if (screen === "playing" || screen === "result") {
     const q = questions[currentIdx];
     if (!q) return null;
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col px-4 py-6">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <BanditosLogo size="sm" />
@@ -298,45 +233,31 @@ export default function PlayPage() {
           </div>
         </div>
 
-        {/* Question */}
         <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full">
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6 mb-6">
             <p className="text-white text-xl font-bold leading-relaxed">{q.text}</p>
             <p className="text-banditos-gold/60 text-sm mt-2">{q.points} points</p>
           </div>
 
-          {/* Options */}
           <div className="space-y-3">
             {q.options.map((opt: string, i: number) => {
               let style = "bg-white/10 border-white/20 text-white hover:bg-white/20";
-
               if (screen === "result" && result) {
-                if (i === result.correctAnswer) {
-                  style = "bg-green-500/30 border-green-400 text-green-300";
-                } else if (i === selected && !result.isCorrect) {
-                  style = "bg-red-500/30 border-red-400 text-red-300";
-                } else {
-                  style = "bg-white/5 border-white/10 text-white/40";
-                }
+                if (i === result.correctAnswer) style = "bg-green-500/30 border-green-400 text-green-300";
+                else if (i === selected && !result.isCorrect) style = "bg-red-500/30 border-red-400 text-red-300";
+                else style = "bg-white/5 border-white/10 text-white/40";
               } else if (i === selected) {
                 style = "bg-banditos-gold/30 border-banditos-gold text-banditos-gold";
               }
-
               return (
-                <button
-                  key={i}
-                  onClick={() => screen === "playing" && submitAnswer(i)}
-                  disabled={screen === "result"}
-                  className={`w-full p-4 rounded-xl border-2 text-left font-medium transition-all ${style}`}
-                >
-                  <span className="font-bold mr-3 opacity-60">{String.fromCharCode(65 + i)}</span>
-                  {opt}
+                <button key={i} onClick={() => screen === "playing" && submitAnswer(i)} disabled={screen === "result"}
+                  className={`w-full p-4 rounded-xl border-2 text-left font-medium transition-all ${style}`}>
+                  <span className="font-bold mr-3 opacity-60">{String.fromCharCode(65 + i)}</span>{opt}
                 </button>
               );
             })}
           </div>
 
-          {/* Result overlay */}
           {screen === "result" && result && (
             <div className="mt-6 animate-slide-up">
               <div className={`rounded-2xl p-6 text-center ${result.isCorrect ? "bg-green-500/20 border border-green-500/40" : "bg-red-500/20 border border-red-500/40"}`}>
@@ -345,11 +266,8 @@ export default function PlayPage() {
                   {result.isCorrect ? `+${result.points} points!` : "Not quite!"}
                 </p>
               </div>
-
-              <button
-                onClick={nextQuestion}
-                className="w-full mt-4 bg-banditos-red text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors"
-              >
+              <button onClick={nextQuestion}
+                className="w-full mt-4 bg-banditos-red text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
                 {currentIdx < questions.length - 1 ? "NEXT QUESTION" : "SEE RESULTS"}
               </button>
             </div>
@@ -359,12 +277,9 @@ export default function PlayPage() {
     );
   }
 
-  // ============ COMPLETE SCREEN ============
+  // ============ COMPLETE ============
   if (screen === "complete" && gameResult) {
-    const pct = gameResult.totalQuestions > 0
-      ? Math.round((gameResult.correctCount / gameResult.totalQuestions) * 100)
-      : 0;
-
+    const pct = gameResult.totalQuestions > 0 ? Math.round((gameResult.correctCount / gameResult.totalQuestions) * 100) : 0;
     let emoji = "😅";
     if (pct === 100) emoji = "🏆";
     else if (pct >= 80) emoji = "🔥";
@@ -375,54 +290,26 @@ export default function PlayPage() {
       <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm text-center animate-slide-up">
           <span className="text-7xl">{emoji}</span>
-
           <h1 className="text-white text-3xl font-bold mt-4">
             {gameResult.perfectRound ? "PERFECT ROUND!" : "Round Complete!"}
           </h1>
-
           <div className="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 space-y-4">
-            <div className="flex justify-between text-white">
-              <span className="text-white/60">Correct</span>
-              <span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span>
-            </div>
-            <div className="flex justify-between text-white">
-              <span className="text-white/60">Points Earned</span>
-              <span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span>
-            </div>
-            {gameResult.bonusPoints > 0 && (
-              <div className="flex justify-between text-white">
-                <span className="text-white/60">Bonus</span>
-                <span className="font-bold text-green-400">+{gameResult.bonusPoints}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-white">
-              <span className="text-white/60">Best Streak</span>
-              <span className="font-bold">{gameResult.maxStreak} 🔥</span>
-            </div>
-
-            {/* Progress bar */}
+            <div className="flex justify-between text-white"><span className="text-white/60">Correct</span><span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span></div>
+            <div className="flex justify-between text-white"><span className="text-white/60">Points Earned</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
+            {gameResult.bonusPoints > 0 && <div className="flex justify-between text-white"><span className="text-white/60">Bonus</span><span className="font-bold text-green-400">+{gameResult.bonusPoints}</span></div>}
+            <div className="flex justify-between text-white"><span className="text-white/60">Best Streak</span><span className="font-bold">{gameResult.maxStreak} 🔥</span></div>
             <div className="pt-2">
               <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-banditos-red to-banditos-gold rounded-full transition-all duration-1000"
-                  style={{ width: `${pct}%` }}
-                />
+                <div className="h-full bg-gradient-to-r from-banditos-red to-banditos-gold rounded-full transition-all duration-1000" style={{ width: `${pct}%` }} />
               </div>
               <p className="text-white/40 text-sm mt-1">{pct}% accuracy</p>
             </div>
           </div>
-
           <div className="mt-6 space-y-3">
-            <button
-              onClick={() => router.push("/leaderboard")}
-              className="w-full bg-banditos-gold text-banditos-dark py-4 rounded-2xl font-bold text-lg hover:opacity-90 transition-opacity"
-            >
+            <button onClick={() => router.push("/leaderboard")} className="w-full bg-banditos-gold text-banditos-dark py-4 rounded-2xl font-bold text-lg hover:opacity-90 transition-opacity">
               VIEW LEADERBOARD
             </button>
-            <button
-              onClick={() => { setScreen("gate"); loadGame(); }}
-              className="w-full bg-white/10 text-white py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors"
-            >
+            <button onClick={() => { setScreen("gate"); loadGame(); }} className="w-full bg-white/10 text-white py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">
               Back to Lobby
             </button>
           </div>

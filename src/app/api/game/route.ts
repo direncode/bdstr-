@@ -1,107 +1,102 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
-// GET /api/game — get game state (is unlocked? active round? current questions?)
+// GET /api/game — game state + questions for active round
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
-  const session = token ? verifyToken(token) : null;
+  const playerId = req.cookies.get("player_id")?.value;
 
-  let state = await prisma.gameState.findUnique({ where: { id: "singleton" } });
-  if (!state) {
-    state = await prisma.gameState.create({ data: { id: "singleton" } });
-  }
+  const { data: state } = await supabase.from("game_state").select("*").eq("id", "singleton").single();
 
-  if (!state.isUnlocked) {
+  if (!state?.is_unlocked) {
     return NextResponse.json({ unlocked: false, round: null, questions: [] });
   }
 
-  // Get active round with questions
-  if (!state.activeRoundId) {
+  if (!state.active_round_id) {
     return NextResponse.json({ unlocked: true, round: null, questions: [] });
   }
 
-  const round = await prisma.round.findUnique({
-    where: { id: state.activeRoundId },
-    include: { questions: { orderBy: { order: "asc" } } },
-  });
+  const { data: round } = await supabase.from("rounds").select("*").eq("id", state.active_round_id).single();
+  const { data: questions } = await supabase
+    .from("questions")
+    .select("*")
+    .eq("round_id", state.active_round_id)
+    .order("sort_order");
 
-  if (!round) {
-    return NextResponse.json({ unlocked: true, round: null, questions: [] });
-  }
-
-  // Get user's existing answers for this round
+  // Get player's existing answers
   let answeredIds: string[] = [];
-  if (session) {
-    const answers = await prisma.answer.findMany({
-      where: {
-        userId: session.userId,
-        questionId: { in: round.questions.map((q) => q.id) },
-      },
-      select: { questionId: true },
-    });
-    answeredIds = answers.map((a) => a.questionId);
+  if (playerId && questions) {
+    const qIds = questions.map((q) => q.id);
+    const { data: answers } = await supabase
+      .from("answers")
+      .select("question_id")
+      .eq("player_id", playerId)
+      .in("question_id", qIds);
+    answeredIds = (answers || []).map((a) => a.question_id);
   }
-
-  // Return questions WITHOUT correct answer (players shouldn't see it)
-  const questions = round.questions.map((q) => ({
-    id: q.id,
-    text: q.text,
-    options: JSON.parse(q.options),
-    points: q.points,
-    order: q.order,
-    answered: answeredIds.includes(q.id),
-  }));
 
   return NextResponse.json({
     unlocked: true,
-    round: { id: round.id, name: round.name, category: round.category },
-    questions,
+    round: round || null,
+    questions: (questions || []).map((q) => ({
+      id: q.id,
+      text: q.question,
+      options: [q.option_a, q.option_b, q.option_c, q.option_d],
+      points: q.points,
+      order: q.sort_order,
+      answered: answeredIds.includes(q.id),
+    })),
   });
 }
 
 // POST /api/game — submit answer
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
-  if (!token) return NextResponse.json({ error: "Login required" }, { status: 401 });
-  const session = verifyToken(token);
-  if (!session) return NextResponse.json({ error: "Login required" }, { status: 401 });
+  const playerId = req.cookies.get("player_id")?.value;
+  if (!playerId) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const { questionId, selected } = await req.json();
-  if (!questionId || selected === undefined) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
+  // selected is 0-3 index, map to A-D
+  const letter = ["A", "B", "C", "D"][selected];
+  if (!letter) return NextResponse.json({ error: "Invalid selection" }, { status: 400 });
 
   // Check not already answered
-  const existing = await prisma.answer.findUnique({
-    where: { userId_questionId: { userId: session.userId, questionId } },
-  });
+  const { data: existing } = await supabase
+    .from("answers")
+    .select("id, is_correct, points")
+    .eq("player_id", playerId)
+    .eq("question_id", questionId)
+    .single();
+
   if (existing) {
-    return NextResponse.json({ error: "Already answered", isCorrect: existing.isCorrect, points: existing.points });
+    return NextResponse.json({ error: "Already answered", isCorrect: existing.is_correct, points: existing.points });
   }
 
-  const question = await prisma.question.findUnique({ where: { id: questionId } });
+  // Get question
+  const { data: question } = await supabase.from("questions").select("*").eq("id", questionId).single();
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
-  const isCorrect = selected === question.correctAnswer;
+  const isCorrect = letter === question.correct;
   const points = isCorrect ? question.points : 0;
 
   // Save answer
-  await prisma.answer.create({
-    data: { userId: session.userId, questionId, selected, isCorrect, points },
+  await supabase.from("answers").insert({
+    player_id: playerId,
+    question_id: questionId,
+    selected: letter,
+    is_correct: isCorrect,
+    points,
   });
 
-  // Update user points
+  // Update player points
   if (points > 0) {
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: { totalPoints: { increment: points } },
-    });
+    const { data: player } = await supabase.from("players").select("total_points").eq("id", playerId).single();
+    await supabase
+      .from("players")
+      .update({ total_points: (player?.total_points || 0) + points })
+      .eq("id", playerId);
   }
 
-  return NextResponse.json({
-    isCorrect,
-    points,
-    correctAnswer: question.correctAnswer,
-  });
+  // Map correct answer back to index
+  const correctIndex = ["A", "B", "C", "D"].indexOf(question.correct);
+
+  return NextResponse.json({ isCorrect, points, correctAnswer: correctIndex });
 }

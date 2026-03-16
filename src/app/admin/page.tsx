@@ -4,18 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 
+interface Question {
+  id: string; question: string;
+  option_a: string; option_b: string; option_c: string; option_d: string;
+  correct: string; sort_order: number;
+}
 interface Round {
-  id: string;
-  name: string;
-  category: string;
-  order: number;
-  questions: { id: string; text: string; options: string[]; correctAnswer: number; order: number }[];
+  id: string; name: string; category: string; sort_order: number;
+  questions: Question[];
 }
 
 export default function AdminPage() {
   const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -24,10 +26,7 @@ export default function AdminPage() {
     try {
       const authRes = await fetch("/api/auth");
       const authData = await authRes.json();
-      if (!authData.user || authData.user.role !== "admin") {
-        router.push("/");
-        return;
-      }
+      if (!authData.player?.is_admin) { router.push("/"); return; }
       setIsAdmin(true);
 
       const adminRes = await fetch("/api/admin");
@@ -35,11 +34,8 @@ export default function AdminPage() {
       setIsUnlocked(adminData.isUnlocked);
       setActiveRoundId(adminData.activeRoundId);
       setRounds(adminData.rounds);
-    } catch {
-      router.push("/");
-    } finally {
-      setLoading(false);
-    }
+    } catch { router.push("/"); }
+    finally { setLoading(false); }
   }, [router]);
 
   useEffect(() => { loadAdmin(); }, [loadAdmin]);
@@ -53,26 +49,25 @@ export default function AdminPage() {
     loadAdmin();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-banditos-dark flex items-center justify-center">
-        <BanditosLogo size="md" />
-      </div>
-    );
-  }
-
+  if (loading) return <div className="min-h-screen bg-banditos-dark flex items-center justify-center"><BanditosLogo size="md" /></div>;
   if (!isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white">← Back</button>
         <BanditosLogo size="sm" />
         <div className="w-10" />
       </div>
 
-      <h1 className="text-white text-2xl font-bold text-center mb-8">Admin Panel</h1>
+      <h1 className="text-white text-2xl font-bold text-center mb-2">Admin Panel</h1>
+      <p className="text-center text-white/40 text-sm mb-8">
+        Edit questions directly in{" "}
+        <a href={`https://supabase.com/dashboard`} target="_blank" rel="noopener noreferrer" className="text-banditos-gold underline">
+          Supabase Table Editor
+        </a>
+        {" "}— it works like a spreadsheet!
+      </p>
 
       <div className="max-w-lg mx-auto space-y-4">
         {/* Unlock Toggle */}
@@ -81,16 +76,12 @@ export default function AdminPage() {
             <div>
               <h2 className="text-white font-bold text-lg">Trivia Gate</h2>
               <p className="text-white/50 text-sm">
-                {isUnlocked ? "Players can see and play the active round" : "Players see a locked screen"}
+                {isUnlocked ? "Players can join" : "Players see a locked screen"}
               </p>
             </div>
             <button
               onClick={() => doAction("toggle-unlock")}
-              className={`px-6 py-3 rounded-xl font-bold text-lg transition-all ${
-                isUnlocked
-                  ? "bg-green-500 text-white hover:bg-green-600"
-                  : "bg-red-500 text-white hover:bg-red-600"
-              }`}
+              className={`px-6 py-3 rounded-xl font-bold text-lg transition-all ${isUnlocked ? "bg-green-500 text-white hover:bg-green-600" : "bg-red-500 text-white hover:bg-red-600"}`}
             >
               {isUnlocked ? "🔓 OPEN" : "🔒 LOCKED"}
             </button>
@@ -103,9 +94,7 @@ export default function AdminPage() {
           <div className="space-y-2">
             <button
               onClick={() => doAction("set-round", { roundId: "" })}
-              className={`w-full p-3 rounded-xl text-left transition-colors ${
-                !activeRoundId ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
-              }`}
+              className={`w-full p-3 rounded-xl text-left transition-colors ${!activeRoundId ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
             >
               None (waiting room)
             </button>
@@ -113,14 +102,10 @@ export default function AdminPage() {
               <button
                 key={r.id}
                 onClick={() => doAction("set-round", { roundId: r.id })}
-                className={`w-full p-3 rounded-xl text-left transition-colors ${
-                  activeRoundId === r.id ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
-                }`}
+                className={`w-full p-3 rounded-xl text-left transition-colors ${activeRoundId === r.id ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
               >
                 <span className="font-medium">{r.name}</span>
-                <span className="text-xs ml-2 opacity-60">
-                  {r.questions.length} questions &middot; {r.category}
-                </span>
+                <span className="text-xs ml-2 opacity-60">{r.questions.length} questions</span>
               </button>
             ))}
           </div>
@@ -143,28 +128,25 @@ export default function AdminPage() {
             <h2 className="text-white font-bold text-lg mb-4">
               Questions: {rounds.find((r) => r.id === activeRoundId)?.name}
             </h2>
-            <div className="space-y-3 max-h-80 overflow-y-auto">
-              {rounds
-                .find((r) => r.id === activeRoundId)
-                ?.questions.map((q, i) => (
-                  <div key={q.id} className="bg-white/5 rounded-xl p-3">
-                    <p className="text-white text-sm font-medium">
-                      {i + 1}. {q.text}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {q.options.map((opt: string, j: number) => (
-                        <span
-                          key={j}
-                          className={`text-xs px-2 py-0.5 rounded ${
-                            j === q.correctAnswer ? "bg-green-500/30 text-green-300" : "bg-white/10 text-white/40"
-                          }`}
-                        >
-                          {opt}
-                        </span>
-                      ))}
-                    </div>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {rounds.find((r) => r.id === activeRoundId)?.questions.map((q, i) => (
+                <div key={q.id} className="bg-white/5 rounded-xl p-3">
+                  <p className="text-white text-sm font-medium">{i + 1}. {q.question}</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {[
+                      { label: "A", val: q.option_a },
+                      { label: "B", val: q.option_b },
+                      { label: "C", val: q.option_c },
+                      { label: "D", val: q.option_d },
+                    ].map((opt) => (
+                      <span key={opt.label}
+                        className={`text-xs px-2 py-0.5 rounded ${opt.label === q.correct ? "bg-green-500/30 text-green-300" : "bg-white/10 text-white/40"}`}>
+                        {opt.label}: {opt.val}
+                      </span>
+                    ))}
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           </div>
         )}

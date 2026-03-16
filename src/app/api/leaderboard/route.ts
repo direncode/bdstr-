@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 
 export async function GET() {
-  const users = await prisma.user.findMany({
-    where: { role: "player" },
-    orderBy: { totalPoints: "desc" },
-    take: 50,
-    select: {
-      id: true,
-      name: true,
-      totalPoints: true,
-      gamesPlayed: true,
-      bestStreak: true,
-    },
-  });
+  const { data: players } = await supabase
+    .from("players")
+    .select("id, name, total_points, games_played, best_streak")
+    .eq("is_admin", false)
+    .order("total_points", { ascending: false })
+    .limit(50);
 
-  return NextResponse.json({ leaderboard: users });
+  return NextResponse.json({ leaderboard: players || [] });
 }

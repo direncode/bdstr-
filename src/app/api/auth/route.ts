@@ -1,71 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { signToken, verifyToken } from "@/lib/auth";
-import { z } from "zod";
+import { supabase } from "@/lib/supabase";
 
-const loginSchema = z.object({ email: z.string().email(), password: z.string() });
-const registerSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(2).max(50),
-  password: z.string().min(6),
-});
-
-// POST /api/auth — login or register
+// POST /api/auth — login by name + PIN
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const action = body.action; // "login" | "register"
+    const { name, pin, action } = await req.json();
 
     if (action === "register") {
-      const data = registerSchema.parse(body);
-      const exists = await prisma.user.findUnique({ where: { email: data.email } });
-      if (exists) return NextResponse.json({ error: "Email taken" }, { status: 409 });
+      if (!name || name.length < 2) return NextResponse.json({ error: "Name too short" }, { status: 400 });
 
-      const user = await prisma.user.create({
-        data: { email: data.email, name: data.name, passwordHash: await bcrypt.hash(data.password, 10) },
-      });
-      const token = signToken(user.id, user.role);
-      const res = NextResponse.json({ user: { id: user.id, name: user.name, role: user.role } });
-      res.cookies.set("token", token, { httpOnly: true, sameSite: "lax", maxAge: 7 * 86400, path: "/" });
+      const { data: existing } = await supabase.from("players").select("id").eq("name", name).single();
+      if (existing) return NextResponse.json({ error: "Name taken, pick another" }, { status: 409 });
+
+      const { data: player, error } = await supabase
+        .from("players")
+        .insert({ name, pin: pin || "1234" })
+        .select()
+        .single();
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      const res = NextResponse.json({ player });
+      res.cookies.set("player_id", player.id, { httpOnly: true, sameSite: "lax", maxAge: 30 * 86400, path: "/" });
       return res;
     }
 
     // Login
-    const data = loginSchema.parse(body);
-    const user = await prisma.user.findUnique({ where: { email: data.email } });
-    if (!user || !(await bcrypt.compare(data.password, user.passwordHash))) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-    }
-    const token = signToken(user.id, user.role);
-    const res = NextResponse.json({ user: { id: user.id, name: user.name, role: user.role } });
-    res.cookies.set("token", token, { httpOnly: true, sameSite: "lax", maxAge: 7 * 86400, path: "/" });
+    if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
+
+    const { data: player, error } = await supabase
+      .from("players")
+      .select("*")
+      .eq("name", name)
+      .eq("pin", pin || "1234")
+      .single();
+
+    if (error || !player) return NextResponse.json({ error: "Wrong name or PIN" }, { status: 401 });
+
+    const res = NextResponse.json({ player });
+    res.cookies.set("player_id", player.id, { httpOnly: true, sameSite: "lax", maxAge: 30 * 86400, path: "/" });
     return res;
-  } catch (err) {
-    if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
-    console.error(err);
+  } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-// GET /api/auth — get current user
+// GET /api/auth — get current player
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
-  if (!token) return NextResponse.json({ user: null });
+  const playerId = req.cookies.get("player_id")?.value;
+  if (!playerId) return NextResponse.json({ player: null });
 
-  const session = verifyToken(token);
-  if (!session) return NextResponse.json({ user: null });
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, name: true, email: true, role: true, totalPoints: true, gamesPlayed: true, bestStreak: true },
-  });
-  return NextResponse.json({ user });
+  const { data: player } = await supabase.from("players").select("*").eq("id", playerId).single();
+  return NextResponse.json({ player: player || null });
 }
 
 // DELETE /api/auth — logout
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("token", "", { maxAge: 0, path: "/" });
+  res.cookies.set("player_id", "", { maxAge: 0, path: "/" });
   return res;
 }
