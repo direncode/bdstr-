@@ -26,7 +26,7 @@ export default function AdminPage() {
     try {
       const authRes = await fetch("/api/auth");
       const authData = await authRes.json();
-      if (!authData.player?.is_admin) { router.push("/"); return; }
+      if (!authData.profile?.is_admin) { router.push("/"); return; }
       setIsAdmin(true);
 
       const adminRes = await fetch("/api/admin");

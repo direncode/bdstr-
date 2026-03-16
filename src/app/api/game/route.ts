@@ -1,11 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
+import { createServerSupabase } from "@/lib/supabase-server";
 
 // GET /api/game — game state + questions for active round
-export async function GET(req: NextRequest) {
-  const playerId = req.cookies.get("player_id")?.value;
+export async function GET() {
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: state } = await supabase.from("game_state").select("*").eq("id", "singleton").maybeSingle();
+  const { data: state } = await supabase
+    .from("game_state")
+    .select("*")
+    .eq("id", "singleton")
+    .maybeSingle();
 
   if (!state?.is_unlocked) {
     return NextResponse.json({ unlocked: false, round: null, questions: [] });
@@ -15,21 +20,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ unlocked: true, round: null, questions: [] });
   }
 
-  const { data: round } = await supabase.from("rounds").select("*").eq("id", state.active_round_id).maybeSingle();
+  const { data: round } = await supabase
+    .from("rounds")
+    .select("*")
+    .eq("id", state.active_round_id)
+    .maybeSingle();
+
   const { data: questions } = await supabase
     .from("questions")
     .select("*")
     .eq("round_id", state.active_round_id)
     .order("sort_order");
 
-  // Get player's existing answers
+  // Get user's existing answers
   let answeredIds: string[] = [];
-  if (playerId && questions) {
+  if (user && questions) {
     const qIds = questions.map((q) => q.id);
     const { data: answers } = await supabase
       .from("answers")
       .select("question_id")
-      .eq("player_id", playerId)
+      .eq("player_id", user.id)
       .in("question_id", qIds);
     answeredIds = (answers || []).map((a) => a.question_id);
   }
@@ -49,12 +59,12 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/game — submit answer
-export async function POST(req: NextRequest) {
-  const playerId = req.cookies.get("player_id")?.value;
-  if (!playerId) return NextResponse.json({ error: "Login required" }, { status: 401 });
+export async function POST(req: Request) {
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
   const { questionId, selected } = await req.json();
-  // selected is 0-3 index, map to A-D
   const letter = ["A", "B", "C", "D"][selected];
   if (!letter) return NextResponse.json({ error: "Invalid selection" }, { status: 400 });
 
@@ -62,7 +72,7 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await supabase
     .from("answers")
     .select("id, is_correct, points")
-    .eq("player_id", playerId)
+    .eq("player_id", user.id)
     .eq("question_id", questionId)
     .maybeSingle();
 
@@ -71,32 +81,43 @@ export async function POST(req: NextRequest) {
   }
 
   // Get question
-  const { data: question } = await supabase.from("questions").select("*").eq("id", questionId).maybeSingle();
+  const { data: question } = await supabase
+    .from("questions")
+    .select("*")
+    .eq("id", questionId)
+    .maybeSingle();
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
   const isCorrect = letter === question.correct;
   const points = isCorrect ? question.points : 0;
 
   // Save answer
-  await supabase.from("answers").insert({
-    player_id: playerId,
+  const { error: ansError } = await supabase.from("answers").insert({
+    player_id: user.id,
     question_id: questionId,
     selected: letter,
     is_correct: isCorrect,
     points,
   });
 
-  // Update player points
-  if (points > 0) {
-    const { data: player } = await supabase.from("players").select("total_points").eq("id", playerId).maybeSingle();
-    await supabase
-      .from("players")
-      .update({ total_points: (player?.total_points || 0) + points })
-      .eq("id", playerId);
+  if (ansError) {
+    console.error("Answer insert error:", ansError);
+    return NextResponse.json({ error: ansError.message }, { status: 500 });
   }
 
-  // Map correct answer back to index
-  const correctIndex = ["A", "B", "C", "D"].indexOf(question.correct);
+  // Update player points
+  if (points > 0) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("total_points")
+      .eq("id", user.id)
+      .maybeSingle();
+    await supabase
+      .from("profiles")
+      .update({ total_points: (profile?.total_points || 0) + points })
+      .eq("id", user.id);
+  }
 
+  const correctIndex = ["A", "B", "C", "D"].indexOf(question.correct);
   return NextResponse.json({ isCorrect, points, correctAnswer: correctIndex });
 }

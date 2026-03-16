@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
+import { createClient, type Profile } from "@/lib/supabase";
 
-interface Player { id: string; name: string; is_admin: boolean; total_points: number }
 interface GameQuestion {
   id: string; text: string; options: string[]; points: number; order: number; answered: boolean;
 }
@@ -19,15 +19,18 @@ type Screen = "auth" | "gate" | "playing" | "result" | "complete";
 
 export default function PlayPage() {
   const router = useRouter();
-  const [player, setPlayer] = useState<Player | null>(null);
+  const supabase = createClient();
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<Screen>("auth");
   const [loading, setLoading] = useState(true);
 
-  // Auth (simple name + PIN)
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [name, setName] = useState("");
-  const [pin, setPin] = useState("1234");
+  // Auth
+  const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
   // Game
   const [unlocked, setUnlocked] = useState(false);
@@ -40,10 +43,11 @@ export default function PlayPage() {
   const [gameResult, setGameResult] = useState<GameComplete | null>(null);
   const [streak, setStreak] = useState(0);
 
+  // Check if already logged in
   useEffect(() => {
     fetch("/api/auth")
       .then((r) => r.json())
-      .then((d) => { if (d.player) { setPlayer(d.player); setScreen("gate"); } })
+      .then((d) => { if (d.profile) { setProfile(d.profile); setScreen("gate"); } })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -64,18 +68,49 @@ export default function PlayPage() {
     if (screen === "gate" || screen === "playing") loadGame();
   }, [screen, loadGame]);
 
+  // Sign up or sign in with Supabase Auth
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, pin, action: authMode === "register" ? "register" : "login" }),
-    });
-    const data = await res.json();
-    if (!res.ok) { setAuthError(data.error); return; }
-    setPlayer(data.player);
-    setScreen("gate");
+    setAuthLoading(true);
+
+    try {
+      if (authMode === "register") {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { display_name: displayName || email.split("@")[0] } },
+        });
+        if (error) { setAuthError(error.message); setAuthLoading(false); return; }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) { setAuthError(error.message); setAuthLoading(false); return; }
+      }
+
+      // Fetch profile after auth
+      const res = await fetch("/api/auth");
+      const data = await res.json();
+      if (data.profile) {
+        setProfile(data.profile);
+        setScreen("gate");
+      } else {
+        // Profile might take a moment to be created by the trigger
+        await new Promise((r) => setTimeout(r, 1000));
+        const res2 = await fetch("/api/auth");
+        const data2 = await res2.json();
+        setProfile(data2.profile);
+        setScreen("gate");
+      }
+    } catch {
+      setAuthError("Something went wrong");
+    }
+    setAuthLoading(false);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setProfile(null);
+    setScreen("auth");
   };
 
   const submitAnswer = async (optionIdx: number) => {
@@ -117,36 +152,36 @@ export default function PlayPage() {
         <BanditosLogo size="md" />
         <div className="mt-8 w-full max-w-sm bg-white/10 backdrop-blur rounded-2xl p-6">
           <div className="flex gap-2 mb-6">
-            <button onClick={() => setAuthMode("login")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "login" ? "bg-banditos-red text-white" : "text-white/60"}`}>
-              Login
-            </button>
             <button onClick={() => setAuthMode("register")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "register" ? "bg-banditos-red text-white" : "text-white/60"}`}>
-              New Player
+              Sign Up
+            </button>
+            <button onClick={() => setAuthMode("login")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "login" ? "bg-banditos-red text-white" : "text-white/60"}`}>
+              Log In
             </button>
           </div>
 
           {authError && <p className="text-red-400 text-sm mb-3 text-center">{authError}</p>}
 
           <form onSubmit={handleAuth} className="space-y-3">
-            <input
-              type="text" value={name} onChange={(e) => setName(e.target.value)} required
-              placeholder="Your name" autoFocus
-              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg"
-            />
-            <input
-              type="text" value={pin} onChange={(e) => setPin(e.target.value)} required
-              placeholder="PIN (default: 1234)" maxLength={8} inputMode="numeric"
-              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none"
-            />
-            <button type="submit" className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors">
-              {authMode === "login" ? "LET'S GO" : "JOIN"}
+            {authMode === "register" && (
+              <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Display name" autoFocus required
+                className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg" />
+            )}
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email" required autoFocus={authMode === "login"}
+              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password (min 6 chars)" required minLength={6}
+              className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
+            <button type="submit" disabled={authLoading}
+              className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50">
+              {authLoading ? "..." : authMode === "register" ? "CREATE ACCOUNT" : "LOG IN"}
             </button>
           </form>
-
-          <p className="text-white/30 text-xs text-center mt-4">
-            Admin: Trivia Host / PIN: 0000
-          </p>
         </div>
+
+        <button onClick={() => router.push("/")} className="mt-6 text-white/40 text-sm hover:text-white/60">← Back</button>
       </div>
     );
   }
@@ -184,10 +219,8 @@ export default function PlayPage() {
                 <p className="text-white/60 mt-2">
                   {questions.length} questions &middot; {questions.filter((q) => !q.answered).length} remaining
                 </p>
-                <button
-                  onClick={() => setScreen("playing")}
-                  className="mt-6 w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors"
-                >
+                <button onClick={() => setScreen("playing")}
+                  className="mt-6 w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors">
                   START
                 </button>
               </div>
@@ -195,21 +228,16 @@ export default function PlayPage() {
           )}
         </div>
 
-        <div className="mt-6 flex gap-3">
-          <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Leaderboard</button>
+        <div className="mt-6 flex gap-3 items-center">
+          <span className="text-white/50 text-sm">{profile?.display_name}</span>
           <span className="text-white/20">|</span>
-          {player?.is_admin && (
-            <>
-              <button onClick={() => router.push("/admin")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Admin</button>
-              <span className="text-white/20">|</span>
-            </>
+          <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Leaderboard</button>
+          {profile?.is_admin && (
+            <><span className="text-white/20">|</span>
+            <button onClick={() => router.push("/admin")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Admin</button></>
           )}
-          <button
-            onClick={async () => { await fetch("/api/auth", { method: "DELETE" }); setPlayer(null); setScreen("auth"); }}
-            className="text-white/40 text-sm hover:text-white/60"
-          >
-            Logout
-          </button>
+          <span className="text-white/20">|</span>
+          <button onClick={handleSignOut} className="text-white/40 text-sm hover:text-white/60">Logout</button>
         </div>
       </div>
     );
@@ -281,21 +309,16 @@ export default function PlayPage() {
   if (screen === "complete" && gameResult) {
     const pct = gameResult.totalQuestions > 0 ? Math.round((gameResult.correctCount / gameResult.totalQuestions) * 100) : 0;
     let emoji = "😅";
-    if (pct === 100) emoji = "🏆";
-    else if (pct >= 80) emoji = "🔥";
-    else if (pct >= 60) emoji = "💪";
-    else if (pct >= 40) emoji = "🌮";
+    if (pct === 100) emoji = "🏆"; else if (pct >= 80) emoji = "🔥"; else if (pct >= 60) emoji = "💪"; else if (pct >= 40) emoji = "🌮";
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm text-center animate-slide-up">
           <span className="text-7xl">{emoji}</span>
-          <h1 className="text-white text-3xl font-bold mt-4">
-            {gameResult.perfectRound ? "PERFECT ROUND!" : "Round Complete!"}
-          </h1>
+          <h1 className="text-white text-3xl font-bold mt-4">{gameResult.perfectRound ? "PERFECT ROUND!" : "Round Complete!"}</h1>
           <div className="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 space-y-4">
             <div className="flex justify-between text-white"><span className="text-white/60">Correct</span><span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span></div>
-            <div className="flex justify-between text-white"><span className="text-white/60">Points Earned</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
+            <div className="flex justify-between text-white"><span className="text-white/60">Points</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
             {gameResult.bonusPoints > 0 && <div className="flex justify-between text-white"><span className="text-white/60">Bonus</span><span className="font-bold text-green-400">+{gameResult.bonusPoints}</span></div>}
             <div className="flex justify-between text-white"><span className="text-white/60">Best Streak</span><span className="font-bold">{gameResult.maxStreak} 🔥</span></div>
             <div className="pt-2">
@@ -306,12 +329,8 @@ export default function PlayPage() {
             </div>
           </div>
           <div className="mt-6 space-y-3">
-            <button onClick={() => router.push("/leaderboard")} className="w-full bg-banditos-gold text-banditos-dark py-4 rounded-2xl font-bold text-lg hover:opacity-90 transition-opacity">
-              VIEW LEADERBOARD
-            </button>
-            <button onClick={() => { setScreen("gate"); loadGame(); }} className="w-full bg-white/10 text-white py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">
-              Back to Lobby
-            </button>
+            <button onClick={() => router.push("/leaderboard")} className="w-full bg-banditos-gold text-banditos-dark py-4 rounded-2xl font-bold text-lg hover:opacity-90 transition-opacity">VIEW LEADERBOARD</button>
+            <button onClick={() => { setScreen("gate"); loadGame(); }} className="w-full bg-white/10 text-white py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">Back to Lobby</button>
           </div>
         </div>
       </div>

@@ -1,15 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder"
+  );
+}
 
 // Types matching our DB schema
-export interface Player {
+export interface Profile {
   id: string;
-  name: string;
-  pin: string;
+  email: string;
+  display_name: string;
   is_admin: boolean;
   total_points: number;
   games_played: number;
@@ -37,19 +39,8 @@ export interface Question {
   sort_order: number;
 }
 
-export interface Answer {
-  id: string;
-  player_id: string;
-  question_id: string;
-  selected: string;
-  is_correct: boolean;
-  points: number;
-  created_at: string;
-}
-
 export interface GameState {
   id: string;
   is_unlocked: boolean;
   active_round_id: string | null;
-  updated_at: string;
 }

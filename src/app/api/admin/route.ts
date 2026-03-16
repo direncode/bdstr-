@@ -1,24 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
+import { createServerSupabase } from "@/lib/supabase-server";
 
-async function isAdmin(req: NextRequest): Promise<boolean> {
-  const playerId = req.cookies.get("player_id")?.value;
-  if (!playerId) return false;
-  const { data } = await supabase.from("players").select("is_admin").eq("id", playerId).maybeSingle();
-  return data?.is_admin === true;
+async function getAdminSupabase() {
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { supabase: null, error: "Not logged in" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.is_admin) return { supabase: null, error: "Not admin" };
+  return { supabase, error: null };
 }
 
-// GET /api/admin — game state + rounds
-export async function GET(req: NextRequest) {
-  if (!(await isAdmin(req))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+export async function GET() {
+  const { supabase, error } = await getAdminSupabase();
+  if (!supabase) return NextResponse.json({ error }, { status: 403 });
 
-  const [{ data: state }, { data: rounds }] = await Promise.all([
-    supabase.from("game_state").select("*").eq("id", "singleton").single(),
+  const [{ data: state }, { data: rounds }, { data: allQuestions }] = await Promise.all([
+    supabase.from("game_state").select("*").eq("id", "singleton").maybeSingle(),
     supabase.from("rounds").select("*").order("sort_order"),
+    supabase.from("questions").select("*").order("sort_order"),
   ]);
-
-  // Get questions for each round
-  const { data: allQuestions } = await supabase.from("questions").select("*").order("sort_order");
 
   const roundsWithQ = (rounds || []).map((r) => ({
     ...r,
@@ -32,9 +38,9 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/admin — actions
-export async function POST(req: NextRequest) {
-  if (!(await isAdmin(req))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+export async function POST(req: Request) {
+  const { supabase, error } = await getAdminSupabase();
+  if (!supabase) return NextResponse.json({ error }, { status: 403 });
 
   const body = await req.json();
 
@@ -46,20 +52,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "set-round") {
-    await supabase
-      .from("game_state")
-      .update({ active_round_id: body.roundId || null, updated_at: new Date().toISOString() })
-      .eq("id", "singleton");
+    await supabase.from("game_state").update({ active_round_id: body.roundId || null, updated_at: new Date().toISOString() }).eq("id", "singleton");
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "reset-answers") {
     const { data: state } = await supabase.from("game_state").select("active_round_id").eq("id", "singleton").maybeSingle();
     if (state?.active_round_id) {
-      const { data: questions } = await supabase
-        .from("questions")
-        .select("id")
-        .eq("round_id", state.active_round_id);
+      const { data: questions } = await supabase.from("questions").select("id").eq("round_id", state.active_round_id);
       if (questions && questions.length > 0) {
         await supabase.from("answers").delete().in("question_id", questions.map((q) => q.id));
       }

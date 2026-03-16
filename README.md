@@ -1,75 +1,46 @@
 # Banditos Trivia
 
-Live trivia app for Bandidos Mexican Cafe, Chapel Hill NC. Powered by Supabase — edit questions like a spreadsheet.
+Live trivia app for Bandidos Mexican Cafe, Chapel Hill NC.
 
 ## Setup (5 minutes)
 
 ### 1. Create a free Supabase project
 
 1. Go to [supabase.com](https://supabase.com) → New Project (free)
-2. Open **SQL Editor** → paste the contents of `supabase/setup.sql` → click **RUN**
-3. That's it — 28 questions, 4 rounds, and demo players are seeded
+2. Open **SQL Editor** → paste `supabase/setup.sql` → click **RUN**
+3. Go to **Authentication → Settings → Email** → turn OFF "Confirm email" (so players can sign up instantly)
 
-### 2. Get your keys
-
-In Supabase Dashboard → **Settings** → **API**:
-- Copy **Project URL** and **anon public** key
-
-### 3. Deploy to Vercel
+### 2. Deploy to Vercel
 
 1. Push this repo to GitHub
-2. Go to [vercel.com](https://vercel.com) → Import → select the repo
-3. Add Environment Variables:
-   - `NEXT_PUBLIC_SUPABASE_URL` = your project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your anon key
-4. Deploy!
+2. Import in [vercel.com](https://vercel.com)
+3. Add these env vars (from Supabase → Settings → API):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Deploy — done!
 
-### Or run locally
+### 3. Create an admin account
 
-```bash
-npm install
-# Create .env.local with your Supabase keys (see above)
-npm run dev
-```
+1. Sign up on the app with your email
+2. In Supabase → Table Editor → `profiles` → set `is_admin` to `true` for your row
 
-## How to edit questions
+## Edit questions
 
-Open your **Supabase Dashboard → Table Editor → questions table**.
-It works just like Google Sheets — click any cell to edit, add rows, delete rows.
+Open **Supabase → Table Editor → questions** — works like Google Sheets.
 
-| Column | What it is |
-|--------|-----------|
-| question | The question text |
-| option_a | Answer A |
-| option_b | Answer B |
-| option_c | Answer C |
-| option_d | Answer D |
-| correct | Which is right: A, B, C, or D |
-| round_id | Which round it belongs to |
-| points | Points awarded (default 10) |
+## How it works
 
-## App Flow
-
-1. **Splash** → Bandidos logo, ENTER button
-2. **Login** → Name + 4-digit PIN (dead simple, no email)
-3. **Gate** → Locked until admin unlocks it
-4. **Trivia** → Questions one at a time, tap to answer
-5. **Results** → Score, streak, bonus points
-6. **Leaderboard** → Ranked by points with level tiers
-
-## Admin
-
-Login as **Trivia Host** / PIN: **0000**
-
-- Toggle game lock/unlock
-- Pick which round is active
-- Reset answers to replay a round
-- Preview all questions
+1. **Splash** → Logo + Enter
+2. **Sign Up / Log In** → Email + password (permanent account via Supabase Auth)
+3. **Gate** → Locked until admin opens it
+4. **Trivia** → Questions one at a time, answer and earn points
+5. **Results** → Score, streak, bonuses
+6. **Leaderboard** → Ranked with level tiers
 
 ## Levels
 
-| Level | Points needed |
-|-------|--------------|
+| Level | Points |
+|-------|--------|
 | 🌱 Newbie | 0 |
 | 🌮 Regular | 50 |
 | 🥉 Bronze | 150 |

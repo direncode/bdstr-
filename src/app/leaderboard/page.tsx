@@ -7,10 +7,10 @@ import { getLevel, getNextLevel, getLevelProgress, LEVELS } from "@/lib/levels";
 
 interface Player {
   id: string;
-  name: string;
-  totalPoints: number;
-  gamesPlayed: number;
-  bestStreak: number;
+  display_name: string;
+  total_points: number;
+  games_played: number;
+  best_streak: number;
 }
 
 export default function LeaderboardPage() {
@@ -73,7 +73,7 @@ export default function LeaderboardPage() {
           <div className="px-4 pb-8 max-w-lg mx-auto space-y-2">
             {rest.map((player, i) => {
               const rank = i + 4;
-              const level = getLevel(player.totalPoints);
+              const level = getLevel(player.total_points);
               return (
                 <button
                   key={player.id}
@@ -83,10 +83,10 @@ export default function LeaderboardPage() {
                   <span className="text-white/40 font-bold w-8 text-center">#{rank}</span>
                   <span className="text-lg">{level.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{player.name}</p>
+                    <p className="text-white font-medium truncate">{player.display_name}</p>
                     <p className="text-white/40 text-xs">{level.name}</p>
                   </div>
-                  <span className="text-banditos-gold font-bold">{player.totalPoints}</span>
+                  <span className="text-banditos-gold font-bold">{player.total_points}</span>
                 </button>
               );
             })}
@@ -103,7 +103,7 @@ export default function LeaderboardPage() {
 }
 
 function PodiumCard({ player, rank, height }: { player: Player; rank: number; height: string }) {
-  const level = getLevel(player.totalPoints);
+  const level = getLevel(player.total_points);
   const medals = ["", "🥇", "🥈", "🥉"];
   const bgColors = ["", "from-yellow-500/30 to-yellow-600/10", "from-gray-400/20 to-gray-500/10", "from-amber-700/20 to-amber-800/10"];
 
@@ -111,39 +111,39 @@ function PodiumCard({ player, rank, height }: { player: Player; rank: number; he
     <div className={`flex-1 max-w-[140px] bg-gradient-to-b ${bgColors[rank]} backdrop-blur border border-white/10 rounded-2xl p-3 ${height} flex flex-col items-center justify-end`}>
       <span className="text-3xl">{medals[rank]}</span>
       <span className="text-lg mt-1">{level.emoji}</span>
-      <p className="text-white font-bold text-sm text-center mt-1 truncate w-full">{player.name}</p>
-      <p className="text-banditos-gold font-bold text-lg">{player.totalPoints}</p>
+      <p className="text-white font-bold text-sm text-center mt-1 truncate w-full">{player.display_name}</p>
+      <p className="text-banditos-gold font-bold text-lg">{player.total_points}</p>
       <p className="text-white/40 text-xs">{level.name}</p>
     </div>
   );
 }
 
 function PlayerModal({ player, onClose }: { player: Player; onClose: () => void }) {
-  const level = getLevel(player.totalPoints);
-  const next = getNextLevel(player.totalPoints);
-  const progress = getLevelProgress(player.totalPoints);
+  const level = getLevel(player.total_points);
+  const next = getNextLevel(player.total_points);
+  const progress = getLevelProgress(player.total_points);
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
       <div className="bg-banditos-dark border border-white/10 rounded-2xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="text-center">
           <span className="text-5xl">{level.emoji}</span>
-          <h2 className="text-white text-xl font-bold mt-2">{player.name}</h2>
+          <h2 className="text-white text-xl font-bold mt-2">{player.display_name}</h2>
           <p className={`text-sm font-medium ${level.color.replace("text-", "text-")}`}>{level.name}</p>
         </div>
 
         <div className="mt-4 space-y-3">
           <div className="flex justify-between text-white/80">
             <span>Total Points</span>
-            <span className="font-bold text-banditos-gold">{player.totalPoints}</span>
+            <span className="font-bold text-banditos-gold">{player.total_points}</span>
           </div>
           <div className="flex justify-between text-white/80">
             <span>Games Played</span>
-            <span className="font-bold">{player.gamesPlayed}</span>
+            <span className="font-bold">{player.games_played}</span>
           </div>
           <div className="flex justify-between text-white/80">
             <span>Best Streak</span>
-            <span className="font-bold">{player.bestStreak} 🔥</span>
+            <span className="font-bold">{player.best_streak} 🔥</span>
           </div>
 
           {next && (
@@ -158,7 +158,7 @@ function PlayerModal({ player, onClose }: { player: Player; onClose: () => void 
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-white/30 text-xs mt-1">{next.minPoints - player.totalPoints} points to next level</p>
+              <p className="text-white/30 text-xs mt-1">{next.minPoints - player.total_points} points to next level</p>
             </div>
           )}
         </div>

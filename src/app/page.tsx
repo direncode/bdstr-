@@ -7,11 +7,11 @@ import { BanditosLogo } from "@/components/BanditosLogo";
 export default function SplashPage() {
   const router = useRouter();
   const [show, setShow] = useState(false);
-  const [player, setPlayer] = useState<{ name: string; is_admin: boolean } | null>(null);
+  const [profile, setProfile] = useState<{ display_name: string; is_admin: boolean } | null>(null);
 
   useEffect(() => {
     setTimeout(() => setShow(true), 200);
-    fetch("/api/auth").then((r) => r.json()).then((d) => setPlayer(d.player)).catch(() => {});
+    fetch("/api/auth").then((r) => r.json()).then((d) => setProfile(d.profile)).catch(() => {});
   }, []);
 
   return (
@@ -25,42 +25,32 @@ export default function SplashPage() {
       </p>
 
       <div className={`mt-10 flex flex-col gap-3 w-full max-w-xs transition-all duration-1000 delay-500 ${show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-        {player ? (
+        {profile ? (
           <>
-            <p className="text-center text-white/70 text-sm mb-1">Welcome back, {player.name}!</p>
-            <button
-              onClick={() => router.push("/play")}
-              className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors"
-            >
+            <p className="text-center text-white/70 text-sm mb-1">Welcome back, {profile.display_name}!</p>
+            <button onClick={() => router.push("/play")}
+              className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors">
               PLAY TRIVIA
             </button>
-            <button
-              onClick={() => router.push("/leaderboard")}
-              className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-2xl font-bold border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors"
-            >
+            <button onClick={() => router.push("/leaderboard")}
+              className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-2xl font-bold border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors">
               LEADERBOARD
             </button>
-            {player.is_admin && (
-              <button
-                onClick={() => router.push("/admin")}
-                className="w-full bg-white/10 text-white/80 py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors"
-              >
+            {profile.is_admin && (
+              <button onClick={() => router.push("/admin")}
+                className="w-full bg-white/10 text-white/80 py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">
                 Admin Panel
               </button>
             )}
           </>
         ) : (
           <>
-            <button
-              onClick={() => router.push("/play")}
-              className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors"
-            >
+            <button onClick={() => router.push("/play")}
+              className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors">
               ENTER
             </button>
-            <button
-              onClick={() => router.push("/leaderboard")}
-              className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-2xl font-bold border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors"
-            >
+            <button onClick={() => router.push("/leaderboard")}
+              className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-2xl font-bold border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors">
               LEADERBOARD
             </button>
           </>

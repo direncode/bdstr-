@@ -1,13 +1,12 @@
 -- ============================================================
--- BANDITOS TRIVIA — Paste this entire file into Supabase SQL Editor and click RUN
--- https://supabase.com/dashboard → Your Project → SQL Editor → New Query
+-- BANDITOS TRIVIA — Paste this into Supabase SQL Editor → RUN
 -- ============================================================
 
--- 1. PLAYERS TABLE
-create table if not exists players (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  pin text not null default '1234',
+-- 1. PROFILES (linked to Supabase Auth users)
+create table if not exists profiles (
+  id uuid references auth.users on delete cascade primary key,
+  email text not null,
+  display_name text not null,
   is_admin boolean default false,
   total_points int default 0,
   games_played int default 0,
@@ -15,7 +14,27 @@ create table if not exists players (
   created_at timestamptz default now()
 );
 
--- 2. ROUNDS TABLE
+-- Auto-create profile when a user signs up
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, display_name)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1))
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Drop trigger if exists, then create
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- 2. ROUNDS
 create table if not exists rounds (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -23,7 +42,7 @@ create table if not exists rounds (
   sort_order int default 0
 );
 
--- 3. QUESTIONS TABLE (edit these like a spreadsheet in the Table Editor!)
+-- 3. QUESTIONS (edit these in the Table Editor like a spreadsheet!)
 create table if not exists questions (
   id uuid default gen_random_uuid() primary key,
   round_id uuid references rounds(id) on delete cascade,
@@ -37,10 +56,10 @@ create table if not exists questions (
   sort_order int default 0
 );
 
--- 4. ANSWERS TABLE
+-- 4. ANSWERS
 create table if not exists answers (
   id uuid default gen_random_uuid() primary key,
-  player_id uuid references players(id) on delete cascade,
+  player_id uuid references profiles(id) on delete cascade,
   question_id uuid references questions(id) on delete cascade,
   selected text not null,
   is_correct boolean not null,
@@ -49,7 +68,7 @@ create table if not exists answers (
   unique(player_id, question_id)
 );
 
--- 5. GAME STATE (singleton row)
+-- 5. GAME STATE (singleton)
 create table if not exists game_state (
   id text primary key default 'singleton',
   is_unlocked boolean default false,
@@ -57,33 +76,40 @@ create table if not exists game_state (
   updated_at timestamptz default now()
 );
 
--- Initialize game state
 insert into game_state (id, is_unlocked) values ('singleton', false) on conflict do nothing;
 
 -- ============================================================
--- ENABLE ROW LEVEL SECURITY (public read, only service key writes)
+-- ROW LEVEL SECURITY
 -- ============================================================
-alter table players enable row level security;
+alter table profiles enable row level security;
 alter table rounds enable row level security;
 alter table questions enable row level security;
 alter table answers enable row level security;
 alter table game_state enable row level security;
 
--- Public read access for everything
-create policy "Public read players" on players for select using (true);
+-- Profiles: anyone can read, users can update their own
+create policy "Anyone can view profiles" on profiles for select using (true);
+create policy "Users can update own profile" on profiles for update using (auth.uid() = id);
+
+-- Rounds & Questions: public read
 create policy "Public read rounds" on rounds for select using (true);
 create policy "Public read questions" on questions for select using (true);
-create policy "Public read answers" on answers for select using (true);
-create policy "Public read game_state" on game_state for select using (true);
 
--- Public insert/update (for the app to work via anon key)
-create policy "Public insert players" on players for insert with check (true);
-create policy "Public update players" on players for update using (true);
-create policy "Public insert answers" on answers for insert with check (true);
+-- Answers: public read, authenticated users can insert their own
+create policy "Public read answers" on answers for select using (true);
+create policy "Users can insert own answers" on answers for insert with check (auth.uid() = player_id);
+
+-- Game state: public read, public update (for admin API)
+create policy "Public read game_state" on game_state for select using (true);
 create policy "Public update game_state" on game_state for update using (true);
 
+-- Allow service role to manage everything (for admin operations)
+create policy "Service can insert profiles" on profiles for insert with check (true);
+create policy "Service can update profiles" on profiles for update using (true);
+create policy "Service can delete answers" on answers for delete using (true);
+
 -- ============================================================
--- SEED DATA — 4 rounds + 28 questions
+-- SEED DATA
 -- ============================================================
 
 -- Rounds
@@ -133,18 +159,8 @@ insert into questions (round_id, question, option_a, option_b, option_c, option_
   ('44444444-4444-4444-4444-444444444444', 'Which UNC alum is considered the basketball GOAT?', 'LeBron James', 'Kobe Bryant', 'Michael Jordan', 'Vince Carter', 'C', 6),
   ('44444444-4444-4444-4444-444444444444', 'What is the traditional UNC cheer?', 'Go Pack Go!', 'Roll Tide!', 'Go Heels!', 'Charge On!', 'C', 7);
 
--- Admin player (PIN: 0000)
-insert into players (name, pin, is_admin) values ('Trivia Host', '0000', true);
-
--- Demo players
-insert into players (name, pin, total_points, games_played, best_streak) values
-  ('Alice J', '1234', 320, 8, 5),
-  ('Bob S', '1234', 210, 5, 3),
-  ('Charlie B', '1234', 485, 12, 7),
-  ('Diana P', '1234', 150, 4, 2),
-  ('Eve W', '1234', 95, 3, 1);
-
 -- ============================================================
--- DONE! Now go to Table Editor to see/edit your questions
--- like a spreadsheet. Add, remove, change anything you want.
+-- IMPORTANT: After running this, go to Authentication → Settings:
+--   1. Disable "Confirm email" (so players can sign up instantly)
+--   2. Or keep it on if you want email verification
 -- ============================================================
