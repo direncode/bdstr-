@@ -36,6 +36,10 @@ export default function SplashPage() {
               className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-2xl font-bold border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors">
               LEADERBOARD
             </button>
+            <button onClick={() => router.push("/wallet")}
+              className="w-full bg-white/10 text-white/80 py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">
+              MY LOYALTY CARD
+            </button>
             {profile.is_admin && (
               <button onClick={() => router.push("/admin")}
                 className="w-full bg-white/10 text-white/80 py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">

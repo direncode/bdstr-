@@ -12,6 +12,7 @@ create table if not exists profiles (
   total_points int default 0,
   games_played int default 0,
   best_streak int default 0,
+  wallet_card_id text,
   created_at timestamptz default now()
 );
 
@@ -51,7 +52,17 @@ create table if not exists answers (
   unique(player_id, question_id)
 );
 
--- 5. GAME STATE (singleton)
+-- 5. ATTENDANCE LOG (manual double points)
+create table if not exists attendance_log (
+  id uuid default gen_random_uuid() primary key,
+  player_id uuid references profiles(id) on delete cascade,
+  admin_id uuid references profiles(id),
+  points_added int not null default 0,
+  note text,
+  created_at timestamptz default now()
+);
+
+-- 6. GAME STATE (singleton)
 create table if not exists game_state (
   id text primary key default 'singleton',
   is_unlocked boolean default false,
@@ -69,6 +80,7 @@ alter table profiles enable row level security;
 alter table rounds enable row level security;
 alter table questions enable row level security;
 alter table answers enable row level security;
+alter table attendance_log enable row level security;
 alter table game_state enable row level security;
 
 -- Allow all operations (our server handles auth via session cookies)
@@ -76,6 +88,7 @@ create policy "Allow all on profiles" on profiles for all using (true) with chec
 create policy "Allow all on rounds" on rounds for all using (true) with check (true);
 create policy "Allow all on questions" on questions for all using (true) with check (true);
 create policy "Allow all on answers" on answers for all using (true) with check (true);
+create policy "Allow all on attendance_log" on attendance_log for all using (true) with check (true);
 create policy "Allow all on game_state" on game_state for all using (true) with check (true);
 
 -- ============================================================

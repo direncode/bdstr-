@@ -20,7 +20,14 @@ export default function AdminPage() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
-  const [tab, setTab] = useState<"game" | "rounds" | "questions">("game");
+  const [tab, setTab] = useState<"game" | "rounds" | "questions" | "attendance">("game");
+
+  // Attendance
+  const [attendSearch, setAttendSearch] = useState("");
+  const [attendPlayers, setAttendPlayers] = useState<{ id: string; display_name: string; total_points: number; games_played: number }[]>([]);
+  const [attendLogs, setAttendLogs] = useState<{ id: string; player_name: string; points_added: number; note: string; created_at: string }[]>([]);
+  const [attendLoading, setAttendLoading] = useState(false);
+  const [doubleResult, setDoubleResult] = useState<{ playerName: string; pointsAdded: number; newTotal: number } | null>(null);
 
   // Round form
   const [newRoundName, setNewRoundName] = useState("");
@@ -174,6 +181,45 @@ export default function AdminPage() {
     await doAction("delete-question", { questionId });
   };
 
+  // Attendance handlers
+  const searchPlayers = async (q: string) => {
+    setAttendSearch(q);
+    if (!q.trim()) { setAttendPlayers([]); return; }
+    setAttendLoading(true);
+    try {
+      const res = await fetch(`/api/attendance?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setAttendPlayers(data.players || []);
+      setAttendLogs(data.logs || []);
+    } finally { setAttendLoading(false); }
+  };
+
+  const loadAttendanceLogs = async () => {
+    const res = await fetch("/api/attendance?q=");
+    const data = await res.json();
+    setAttendLogs(data.logs || []);
+  };
+
+  const addDoublePoints = async (playerId: string, basePoints: number = 10) => {
+    if (!confirm(`Add ${basePoints * 2} double points to this player?`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, basePoints }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setDoubleResult(data);
+        setTimeout(() => setDoubleResult(null), 3000);
+        // Refresh search results
+        if (attendSearch.trim()) searchPlayers(attendSearch);
+        loadAttendanceLogs();
+      }
+    } finally { setSaving(false); }
+  };
+
   if (loading) return <div className="min-h-screen bg-banditos-dark flex items-center justify-center"><BanditosLogo size="md" /></div>;
   if (!isAdmin) return null;
 
@@ -190,14 +236,14 @@ export default function AdminPage() {
       <h1 className="text-white text-2xl font-bold text-center mb-6">Admin Panel</h1>
 
       {/* Tabs */}
-      <div className="flex justify-center gap-2 mb-6">
-        {(["game", "rounds", "questions"] as const).map((t) => (
+      <div className="flex justify-center gap-2 mb-6 flex-wrap">
+        {(["game", "rounds", "questions", "attendance"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => { setTab(t); if (t === "attendance") loadAttendanceLogs(); }}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${tab === t ? "bg-banditos-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
           >
-            {t === "game" ? "Game Controls" : t === "rounds" ? "Rounds" : "Questions"}
+            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : "Attendance"}
           </button>
         ))}
       </div>
@@ -470,6 +516,83 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {/* ==================== ATTENDANCE TAB ==================== */}
+        {tab === "attendance" && (
+          <>
+            {/* Double points success banner */}
+            {doubleResult && (
+              <div className="bg-green-500/20 border border-green-500/40 rounded-2xl p-4 text-center animate-slide-up">
+                <p className="text-green-300 font-bold text-lg">+{doubleResult.pointsAdded} points added!</p>
+                <p className="text-green-300/60 text-sm">{doubleResult.playerName} now has {doubleResult.newTotal} total</p>
+              </div>
+            )}
+
+            {/* Player Search */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-2">Add Double Points</h2>
+              <p className="text-white/40 text-sm mb-4">Search for a player from the paper sign-in sheet, then award 2x points for attendance.</p>
+
+              <input
+                type="text"
+                placeholder="Search player by name..."
+                value={attendSearch}
+                onChange={(e) => searchPlayers(e.target.value)}
+                autoFocus
+                className="w-full bg-white/10 text-white rounded-xl px-4 py-3 placeholder-white/30 outline-none focus:ring-2 focus:ring-banditos-gold text-lg"
+              />
+
+              {attendLoading && <p className="text-white/30 text-sm mt-3">Searching...</p>}
+
+              {attendPlayers.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {attendPlayers.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors">
+                      <div>
+                        <p className="text-white font-medium">{p.display_name}</p>
+                        <p className="text-white/40 text-xs">{p.total_points} pts &middot; {p.games_played} games</p>
+                      </div>
+                      <button
+                        onClick={() => addDoublePoints(p.id)}
+                        disabled={saving}
+                        className="bg-banditos-gold text-banditos-dark px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40"
+                      >
+                        +20 Double
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {attendSearch.trim() && !attendLoading && attendPlayers.length === 0 && (
+                <p className="text-white/30 text-sm mt-3">No players found for &quot;{attendSearch}&quot;</p>
+              )}
+            </div>
+
+            {/* Recent Attendance Log */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-4">Recent Attendance Log</h2>
+              {attendLogs.length === 0 ? (
+                <p className="text-white/40 text-center py-4">No attendance entries yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {attendLogs.map((log) => (
+                    <div key={log.id} className="flex items-center justify-between bg-white/5 rounded-xl p-3">
+                      <div>
+                        <p className="text-white font-medium text-sm">{log.player_name}</p>
+                        <p className="text-white/30 text-xs">{log.note}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-green-400 font-bold text-sm">+{log.points_added}</p>
+                        <p className="text-white/20 text-xs">{new Date(log.created_at).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>

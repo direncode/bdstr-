@@ -8,6 +8,7 @@ export interface Profile {
   total_points: number;
   games_played: number;
   best_streak: number;
+  wallet_card_id: string | null;
   created_at: string;
 }
 
@@ -25,6 +26,15 @@ export interface Question {
   answer: string;
   points: number;
   sort_order: number;
+}
+
+export interface AttendanceLog {
+  id: string;
+  player_id: string;
+  admin_id: string;
+  points_added: number;
+  note: string | null;
+  created_at: string;
 }
 
 export interface GameState {
