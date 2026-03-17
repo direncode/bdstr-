@@ -15,6 +15,12 @@ create table if not exists profiles (
   created_at timestamptz default now()
 );
 
+-- Index for fast session lookups (every API request checks this)
+create index if not exists idx_profiles_session_token on profiles(session_token) where session_token is not null;
+
+-- Index for fast display_name lookups (login)
+create index if not exists idx_profiles_display_name on profiles(display_name);
+
 -- 2. ROUNDS
 create table if not exists rounds (
   id uuid default gen_random_uuid() primary key,

@@ -1,44 +1,30 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSession } from "@/lib/session";
+import { getGameState } from "@/lib/game-cache";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/game — game state + questions for active round
 export async function GET() {
-  const supabase = await createServerSupabase();
-  const profile = await getSession();
+  const [profile, gameState] = await Promise.all([
+    getSession(),
+    getGameState(),
+  ]);
 
-  const { data: state } = await supabase
-    .from("game_state")
-    .select("*")
-    .eq("id", "singleton")
-    .maybeSingle();
-
-  if (!state?.is_unlocked) {
+  if (!gameState.unlocked) {
     return NextResponse.json({ unlocked: false, round: null, questions: [] });
   }
 
-  if (!state.active_round_id) {
+  if (!gameState.round) {
     return NextResponse.json({ unlocked: true, round: null, questions: [] });
   }
 
-  const { data: round } = await supabase
-    .from("rounds")
-    .select("*")
-    .eq("id", state.active_round_id)
-    .maybeSingle();
-
-  const { data: questions } = await supabase
-    .from("questions")
-    .select("*")
-    .eq("round_id", state.active_round_id)
-    .order("sort_order");
-
-  // Get user's existing answers
+  // Get user's existing answers (only DB call that varies per-user)
   let answeredIds: string[] = [];
-  if (profile && questions) {
-    const qIds = questions.map((q) => q.id);
+  if (profile && gameState.questions.length > 0) {
+    const supabase = await createServerSupabase();
+    const qIds = gameState.questions.map((q) => q.id);
     const { data: answers } = await supabase
       .from("answers")
       .select("question_id")
@@ -49,8 +35,8 @@ export async function GET() {
 
   return NextResponse.json({
     unlocked: true,
-    round: round || null,
-    questions: (questions || []).map((q) => ({
+    round: gameState.round,
+    questions: gameState.questions.map((q) => ({
       id: q.id,
       text: q.question,
       options: [q.option_a, q.option_b, q.option_c, q.option_d],
@@ -83,16 +69,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Already answered", isCorrect: existing.is_correct, points: existing.points });
   }
 
-  // Get question
-  const { data: question } = await supabase
-    .from("questions")
-    .select("*")
-    .eq("id", questionId)
-    .maybeSingle();
+  // Use cached questions instead of another DB call
+  const gameState = await getGameState();
+  const question = gameState.questions.find((q) => q.id === questionId);
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
   const isCorrect = letter === question.correct;
-  const points = isCorrect ? question.points : 0;
+  const points = isCorrect ? (question.points as number) : 0;
 
   // Save answer
   const { error: ansError } = await supabase.from("answers").insert({
@@ -108,12 +91,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: ansError.message }, { status: 500 });
   }
 
-  // Update player points
+  // Update player points (fire and forget for speed)
   if (points > 0) {
-    await supabase
+    supabase
       .from("profiles")
       .update({ total_points: (profile.total_points || 0) + points })
-      .eq("id", profile.id);
+      .eq("id", profile.id)
+      .then(() => {});
   }
 
   const correctIndex = ["A", "B", "C", "D"].indexOf(question.correct as string);

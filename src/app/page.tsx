@@ -42,6 +42,12 @@ export default function SplashPage() {
                 Admin Panel
               </button>
             )}
+            {profile.is_admin && (
+              <button onClick={() => router.push("/qr")}
+                className="w-full bg-white/5 text-white/50 py-2 rounded-2xl text-sm border border-white/10 hover:bg-white/10 transition-colors">
+                Print QR Code
+              </button>
+            )}
           </>
         ) : (
           <>

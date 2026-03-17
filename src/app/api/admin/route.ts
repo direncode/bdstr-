@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSession } from "@/lib/session";
+import { invalidateGameCache } from "@/lib/game-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,9 @@ export async function POST(req: Request) {
   if (!supabase) return NextResponse.json({ error }, { status: 403 });
 
   const body = await req.json();
+
+  // Invalidate cached game state after any admin action
+  invalidateGameCache();
 
   if (body.action === "toggle-unlock") {
     const { data: state } = await supabase.from("game_state").select("is_unlocked").eq("id", "singleton").maybeSingle();
