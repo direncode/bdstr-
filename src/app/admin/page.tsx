@@ -5,16 +5,13 @@ import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 
 interface Question {
-  id: string; question: string;
-  option_a: string; option_b: string; option_c: string; option_d: string;
-  correct: string; sort_order: number; round_id: string;
+  id: string; question: string; answer: string;
+  points: number; sort_order: number; round_id: string;
 }
 interface Round {
   id: string; name: string; category: string; sort_order: number;
   questions: Question[];
 }
-
-const emptyQuestion = { question: "", option_a: "", option_b: "", option_c: "", option_d: "", correct: "A" };
 
 export default function AdminPage() {
   const router = useRouter();
@@ -32,7 +29,8 @@ export default function AdminPage() {
 
   // Question form
   const [selectedRoundId, setSelectedRoundId] = useState<string>("");
-  const [qForm, setQForm] = useState(emptyQuestion);
+  const [newQuestion, setNewQuestion] = useState("");
+  const [newAnswer, setNewAnswer] = useState("");
 
   // Inline editing
   const [editCell, setEditCell] = useState<{ qId: string; field: string } | null>(null);
@@ -101,7 +99,6 @@ export default function AdminPage() {
         setSaveStatus({ qId, ok: false });
       } else {
         setSaveStatus({ qId, ok: true });
-        // Update local state immediately
         setRounds((prev) =>
           prev.map((r) => ({
             ...r,
@@ -132,7 +129,7 @@ export default function AdminPage() {
       e.preventDefault();
       saveCell(qId, field, editValue);
       // Move to next cell
-      const fields = ["question", "option_a", "option_b", "option_c", "option_d"];
+      const fields = ["question", "answer"];
       const currentRoundQuestions = rounds.find((r) => r.id === selectedRoundId)?.questions || [];
       const qIdx = currentRoundQuestions.findIndex((q) => q.id === qId);
       const fIdx = fields.indexOf(field);
@@ -167,9 +164,9 @@ export default function AdminPage() {
 
   // Question handlers
   const handleAddQuestion = async () => {
-    if (!selectedRoundId || !qForm.question.trim()) return;
-    await doAction("add-question", { round_id: selectedRoundId, ...qForm });
-    setQForm({ ...emptyQuestion });
+    if (!selectedRoundId || !newQuestion.trim() || !newAnswer.trim()) return;
+    await doAction("add-question", { round_id: selectedRoundId, question: newQuestion.trim(), answer: newAnswer.trim() });
+    setNewQuestion(""); setNewAnswer("");
   };
 
   const handleDeleteQuestion = async (questionId: string) => {
@@ -361,7 +358,7 @@ export default function AdminPage() {
                   <h2 className="text-white font-bold text-lg">
                     Questions ({currentRoundQuestions.length})
                   </h2>
-                  <p className="text-white/30 text-xs">Click any cell to edit · Tab to move · Enter to save</p>
+                  <p className="text-white/30 text-xs">Click to edit · Tab to move · Enter to save</p>
                 </div>
 
                 {currentRoundQuestions.length === 0 ? (
@@ -372,12 +369,8 @@ export default function AdminPage() {
                       <thead>
                         <tr className="border-b border-white/10">
                           <th className="text-white/40 font-medium text-left px-3 py-2 w-8">#</th>
-                          <th className="text-white/40 font-medium text-left px-3 py-2 min-w-[200px]">Question</th>
-                          <th className="text-white/40 font-medium text-left px-3 py-2 min-w-[100px]">A</th>
-                          <th className="text-white/40 font-medium text-left px-3 py-2 min-w-[100px]">B</th>
-                          <th className="text-white/40 font-medium text-left px-3 py-2 min-w-[100px]">C</th>
-                          <th className="text-white/40 font-medium text-left px-3 py-2 min-w-[100px]">D</th>
-                          <th className="text-white/40 font-medium text-center px-3 py-2 w-16">Ans</th>
+                          <th className="text-white/40 font-medium text-left px-3 py-2">Question</th>
+                          <th className="text-white/40 font-medium text-left px-3 py-2 w-1/3">Answer</th>
                           <th className="text-white/40 font-medium text-center px-3 py-2 w-12"></th>
                         </tr>
                       </thead>
@@ -408,43 +401,26 @@ export default function AdminPage() {
                               )}
                             </td>
 
-                            {/* Options A–D */}
-                            {(["option_a", "option_b", "option_c", "option_d"] as const).map((field) => (
-                              <td key={field} className="px-1 py-1">
-                                {editCell?.qId === q.id && editCell.field === field ? (
-                                  <input
-                                    ref={editRef as React.RefObject<HTMLInputElement>}
-                                    type="text"
-                                    value={editValue}
-                                    onChange={(e) => setEditValue(e.target.value)}
-                                    onBlur={() => saveCell(q.id, field, editValue)}
-                                    onKeyDown={(e) => handleEditKeyDown(e, q.id, field)}
-                                    className="w-full bg-banditos-gold/20 text-white rounded-lg px-2 py-1.5 outline-none ring-2 ring-banditos-gold text-sm"
-                                  />
-                                ) : (
-                                  <div
-                                    onClick={() => startEdit(q.id, field, q[field])}
-                                    className={`cursor-pointer px-2 py-1.5 rounded-lg hover:bg-white/10 min-h-[32px] transition-colors text-sm ${field.slice(-1).toUpperCase() === q.correct ? "text-green-300" : "text-white/70"}`}
-                                  >
-                                    {q[field] || <span className="text-white/20 italic">empty</span>}
-                                  </div>
-                                )}
-                              </td>
-                            ))}
-
-                            {/* Correct answer selector */}
+                            {/* Answer */}
                             <td className="px-1 py-1">
-                              <div className="flex gap-0.5 justify-center">
-                                {["A", "B", "C", "D"].map((letter) => (
-                                  <button
-                                    key={letter}
-                                    onClick={() => saveCell(q.id, "correct", letter)}
-                                    className={`w-7 h-7 rounded text-xs font-bold transition-colors ${q.correct === letter ? "bg-green-500 text-white" : "bg-white/5 text-white/30 hover:bg-white/15"}`}
-                                  >
-                                    {letter}
-                                  </button>
-                                ))}
-                              </div>
+                              {editCell?.qId === q.id && editCell.field === "answer" ? (
+                                <input
+                                  ref={editRef as React.RefObject<HTMLInputElement>}
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={() => saveCell(q.id, "answer", editValue)}
+                                  onKeyDown={(e) => handleEditKeyDown(e, q.id, "answer")}
+                                  className="w-full bg-banditos-gold/20 text-white rounded-lg px-2 py-1.5 outline-none ring-2 ring-banditos-gold text-sm"
+                                />
+                              ) : (
+                                <div
+                                  onClick={() => startEdit(q.id, "answer", q.answer)}
+                                  className="text-green-300 cursor-pointer px-2 py-1.5 rounded-lg hover:bg-white/10 min-h-[32px] transition-colors font-medium"
+                                >
+                                  {q.answer || <span className="text-white/20 italic">empty</span>}
+                                </div>
+                              )}
                             </td>
 
                             {/* Delete */}
@@ -468,44 +444,28 @@ export default function AdminPage() {
                 {/* Inline add row */}
                 <div className="border-t border-white/10 p-4">
                   <p className="text-white/40 text-xs mb-3">Add new question:</p>
-                  <div className="space-y-2">
-                    <textarea
-                      placeholder="Question text"
-                      value={qForm.question} onChange={(e) => setQForm({ ...qForm, question: e.target.value })}
-                      rows={2}
-                      className="w-full bg-white/5 text-white rounded-xl px-4 py-3 placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold resize-none text-sm"
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Question"
+                      value={newQuestion}
+                      onChange={(e) => setNewQuestion(e.target.value)}
+                      className="flex-1 bg-white/5 text-white rounded-xl px-4 py-3 placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold text-sm"
                     />
-                    <div className="grid grid-cols-4 gap-2">
-                      <input type="text" placeholder="Option A" value={qForm.option_a} onChange={(e) => setQForm({ ...qForm, option_a: e.target.value })}
-                        className="bg-white/5 text-white rounded-lg px-3 py-2 placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold text-sm" />
-                      <input type="text" placeholder="Option B" value={qForm.option_b} onChange={(e) => setQForm({ ...qForm, option_b: e.target.value })}
-                        className="bg-white/5 text-white rounded-lg px-3 py-2 placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold text-sm" />
-                      <input type="text" placeholder="Option C" value={qForm.option_c} onChange={(e) => setQForm({ ...qForm, option_c: e.target.value })}
-                        className="bg-white/5 text-white rounded-lg px-3 py-2 placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold text-sm" />
-                      <input type="text" placeholder="Option D" value={qForm.option_d} onChange={(e) => setQForm({ ...qForm, option_d: e.target.value })}
-                        className="bg-white/5 text-white rounded-lg px-3 py-2 placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold text-sm" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/40 text-xs">Correct:</span>
-                        {["A", "B", "C", "D"].map((letter) => (
-                          <button
-                            key={letter}
-                            onClick={() => setQForm({ ...qForm, correct: letter })}
-                            className={`w-8 h-8 rounded-lg font-bold text-xs transition-colors ${qForm.correct === letter ? "bg-green-500 text-white" : "bg-white/10 text-white/40 hover:bg-white/20"}`}
-                          >
-                            {letter}
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        onClick={handleAddQuestion}
-                        disabled={saving || !qForm.question.trim() || !qForm.option_a.trim() || !qForm.option_b.trim() || !qForm.option_c.trim() || !qForm.option_d.trim()}
-                        className="bg-banditos-green text-white px-6 py-2 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40"
-                      >
-                        + Add
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="Answer"
+                      value={newAnswer}
+                      onChange={(e) => setNewAnswer(e.target.value)}
+                      className="w-1/3 bg-white/5 text-white rounded-xl px-4 py-3 placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold text-sm"
+                    />
+                    <button
+                      onClick={handleAddQuestion}
+                      disabled={saving || !newQuestion.trim() || !newAnswer.trim()}
+                      className="bg-banditos-green text-white px-5 py-3 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
+                    >
+                      + Add
+                    </button>
                   </div>
                 </div>
               </div>

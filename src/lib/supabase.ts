@@ -22,11 +22,7 @@ export interface Question {
   id: string;
   round_id: string;
   question: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct: "A" | "B" | "C" | "D";
+  answer: string;
   points: number;
   sort_order: number;
 }

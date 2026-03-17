@@ -5,6 +5,11 @@ import { getGameState } from "@/lib/game-cache";
 
 export const dynamic = "force-dynamic";
 
+// Normalize text for comparison: lowercase, trim, strip punctuation
+function normalize(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
+}
+
 // GET /api/game — game state + questions for active round
 export async function GET() {
   const [profile, gameState] = await Promise.all([
@@ -39,7 +44,6 @@ export async function GET() {
     questions: gameState.questions.map((q) => ({
       id: q.id,
       text: q.question,
-      options: [q.option_a, q.option_b, q.option_c, q.option_d],
       points: q.points,
       order: q.sort_order,
       answered: answeredIds.includes(q.id as string),
@@ -53,9 +57,10 @@ export async function POST(req: Request) {
   const profile = await getSession();
   if (!profile) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
-  const { questionId, selected } = await req.json();
-  const letter = ["A", "B", "C", "D"][selected];
-  if (!letter) return NextResponse.json({ error: "Invalid selection" }, { status: 400 });
+  const { questionId, answer } = await req.json();
+  if (!answer || typeof answer !== "string") {
+    return NextResponse.json({ error: "Answer is required" }, { status: 400 });
+  }
 
   // Check not already answered
   const { data: existing } = await supabase
@@ -74,14 +79,14 @@ export async function POST(req: Request) {
   const question = gameState.questions.find((q) => q.id === questionId);
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
-  const isCorrect = letter === question.correct;
+  const isCorrect = normalize(answer) === normalize(question.answer as string);
   const points = isCorrect ? (question.points as number) : 0;
 
   // Save answer
   const { error: ansError } = await supabase.from("answers").insert({
     player_id: profile.id,
     question_id: questionId,
-    selected: letter,
+    submitted: answer.trim(),
     is_correct: isCorrect,
     points,
   });
@@ -100,6 +105,9 @@ export async function POST(req: Request) {
       .then(() => {});
   }
 
-  const correctIndex = ["A", "B", "C", "D"].indexOf(question.correct as string);
-  return NextResponse.json({ isCorrect, points, correctAnswer: correctIndex });
+  return NextResponse.json({
+    isCorrect,
+    points,
+    correctAnswer: question.answer as string,
+  });
 }

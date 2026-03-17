@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 import type { Profile } from "@/lib/supabase";
 
 interface GameQuestion {
-  id: string; text: string; options: string[]; points: number; order: number; answered: boolean;
+  id: string; text: string; points: number; order: number; answered: boolean;
 }
 interface RoundInfo { id: string; name: string; category: string }
-interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: number }
+interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: string }
 interface GameComplete {
   correctCount: number; totalQuestions: number; totalPoints: number;
   bonusPoints: number; maxStreak: number; perfectRound: boolean;
@@ -35,11 +35,12 @@ export default function PlayPage() {
   const [round, setRound] = useState<RoundInfo | null>(null);
   const [questions, setQuestions] = useState<GameQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [answerText, setAnswerText] = useState("");
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [gameResult, setGameResult] = useState<GameComplete | null>(null);
   const [streak, setStreak] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Check if already logged in
   useEffect(() => {
@@ -65,6 +66,13 @@ export default function PlayPage() {
   useEffect(() => {
     if (screen === "gate" || screen === "playing") loadGame();
   }, [screen, loadGame]);
+
+  // Auto-focus input when playing
+  useEffect(() => {
+    if (screen === "playing" && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [screen, currentIdx]);
 
   // Sign up or sign in via server API
   const handleAuth = async (e: React.FormEvent) => {
@@ -109,14 +117,14 @@ export default function PlayPage() {
     setScreen("auth");
   };
 
-  const submitAnswer = async (optionIdx: number) => {
-    if (submitting || selected !== null) return;
-    setSelected(optionIdx);
+  const submitAnswer = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (submitting || !answerText.trim()) return;
     setSubmitting(true);
     const res = await fetch("/api/game", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ questionId: questions[currentIdx].id, selected: optionIdx }),
+      body: JSON.stringify({ questionId: questions[currentIdx].id, answer: answerText.trim() }),
     });
     const data = await res.json();
     setResult(data);
@@ -126,7 +134,7 @@ export default function PlayPage() {
   };
 
   const nextQuestion = () => {
-    setSelected(null);
+    setAnswerText("");
     setResult(null);
     if (currentIdx < questions.length - 1) { setCurrentIdx(currentIdx + 1); setScreen("playing"); }
     else { completeGame(); }
@@ -258,38 +266,47 @@ export default function PlayPage() {
             <p className="text-banditos-gold/60 text-sm mt-2">{q.points} points</p>
           </div>
 
-          <div className="space-y-3">
-            {q.options.map((opt: string, i: number) => {
-              let style = "bg-white/10 border-white/20 text-white hover:bg-white/20";
-              if (screen === "result" && result) {
-                if (i === result.correctAnswer) style = "bg-green-500/30 border-green-400 text-green-300";
-                else if (i === selected && !result.isCorrect) style = "bg-red-500/30 border-red-400 text-red-300";
-                else style = "bg-white/5 border-white/10 text-white/40";
-              } else if (i === selected) {
-                style = "bg-banditos-gold/30 border-banditos-gold text-banditos-gold";
-              }
-              return (
-                <button key={i} onClick={() => screen === "playing" && submitAnswer(i)} disabled={screen === "result"}
-                  className={`w-full p-4 rounded-xl border-2 text-left font-medium transition-all ${style}`}>
-                  <span className="font-bold mr-3 opacity-60">{String.fromCharCode(65 + i)}</span>{opt}
-                </button>
-              );
-            })}
-          </div>
-
-          {screen === "result" && result && (
-            <div className="mt-6 animate-slide-up">
-              <div className={`rounded-2xl p-6 text-center ${result.isCorrect ? "bg-green-500/20 border border-green-500/40" : "bg-red-500/20 border border-red-500/40"}`}>
-                <span className="text-4xl">{result.isCorrect ? "✅" : "❌"}</span>
-                <p className="text-white font-bold text-lg mt-2">
-                  {result.isCorrect ? `+${result.points} points!` : "Not quite!"}
-                </p>
-              </div>
-              <button onClick={nextQuestion}
-                className="w-full mt-4 bg-banditos-red text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
-                {currentIdx < questions.length - 1 ? "NEXT QUESTION" : "SEE RESULTS"}
+          {screen === "playing" ? (
+            <form onSubmit={submitAnswer} className="space-y-3">
+              <input
+                ref={inputRef}
+                type="text"
+                value={answerText}
+                onChange={(e) => setAnswerText(e.target.value)}
+                placeholder="Type your answer..."
+                autoComplete="off"
+                autoCapitalize="off"
+                className="w-full px-5 py-4 rounded-2xl bg-white/10 text-white text-lg placeholder-white/30 border-2 border-white/20 focus:border-banditos-gold outline-none transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={submitting || !answerText.trim()}
+                className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {submitting ? "..." : "SUBMIT"}
               </button>
-            </div>
+            </form>
+          ) : (
+            /* Result */
+            result && (
+              <div className="animate-slide-up">
+                <div className={`rounded-2xl p-6 text-center ${result.isCorrect ? "bg-green-500/20 border border-green-500/40" : "bg-red-500/20 border border-red-500/40"}`}>
+                  <span className="text-4xl">{result.isCorrect ? "✅" : "❌"}</span>
+                  <p className="text-white font-bold text-lg mt-2">
+                    {result.isCorrect ? `+${result.points} points!` : "Not quite!"}
+                  </p>
+                  {!result.isCorrect && (
+                    <p className="text-white/60 mt-2 text-sm">
+                      The answer was: <span className="text-banditos-gold font-bold">{result.correctAnswer}</span>
+                    </p>
+                  )}
+                </div>
+                <button onClick={nextQuestion}
+                  className="w-full mt-4 bg-banditos-red text-white py-4 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
+                  {currentIdx < questions.length - 1 ? "NEXT QUESTION" : "SEE RESULTS"}
+                </button>
+              </div>
+            )
           )}
         </div>
       </div>

@@ -97,14 +97,14 @@ export async function POST(req: Request) {
 
   // --- Question CRUD ---
   if (body.action === "add-question") {
-    const { round_id, question, option_a, option_b, option_c, option_d, correct } = body;
-    if (!round_id || !question || !option_a || !option_b || !option_c || !option_d || !correct) {
-      return NextResponse.json({ error: "All fields required" }, { status: 400 });
+    const { round_id, question, answer } = body;
+    if (!round_id || !question || !answer) {
+      return NextResponse.json({ error: "Question and answer required" }, { status: 400 });
     }
     const { data: maxOrder } = await supabase.from("questions").select("sort_order").eq("round_id", round_id).order("sort_order", { ascending: false }).limit(1).maybeSingle();
     const nextOrder = ((maxOrder?.sort_order as number) ?? 0) + 1;
     const { data, error: insertErr } = await supabase.from("questions").insert({
-      round_id, question, option_a, option_b, option_c, option_d, correct, sort_order: nextOrder,
+      round_id, question, answer, sort_order: nextOrder,
     }).select().maybeSingle();
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
     return NextResponse.json({ question: data });
@@ -113,7 +113,7 @@ export async function POST(req: Request) {
   if (body.action === "edit-question") {
     const { questionId, ...fields } = body;
     if (!questionId) return NextResponse.json({ error: "questionId required" }, { status: 400 });
-    const allowed = ["question", "option_a", "option_b", "option_c", "option_d", "correct", "round_id", "sort_order"];
+    const allowed = ["question", "answer", "round_id", "sort_order", "points"];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (fields[key] !== undefined) updates[key] = fields[key];
