@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
+import { BusynessBar } from "@/components/BusynessBar";
 
 export default function SplashPage() {
   const router = useRouter();
@@ -65,6 +66,10 @@ export default function SplashPage() {
             </button>
           </>
         )}
+      </div>
+
+      <div className={`mt-8 w-full max-w-xs transition-all duration-1000 delay-700 ${show ? "opacity-100" : "opacity-0"}`}>
+        <BusynessBar />
       </div>
 
       <p className="absolute bottom-6 text-white/30 text-xs">

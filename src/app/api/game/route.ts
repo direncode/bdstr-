@@ -10,7 +10,7 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
 }
 
-// GET /api/game — game state + questions for active round
+// GET /api/game — game state + questions (limited by busyness)
 export async function GET() {
   const [profile, gameState] = await Promise.all([
     getSession(),
@@ -18,18 +18,21 @@ export async function GET() {
   ]);
 
   if (!gameState.unlocked) {
-    return NextResponse.json({ unlocked: false, round: null, questions: [] });
+    return NextResponse.json({ unlocked: false, round: null, questions: [], busyness: null });
   }
 
   if (!gameState.round) {
-    return NextResponse.json({ unlocked: true, round: null, questions: [] });
+    return NextResponse.json({ unlocked: true, round: null, questions: [], busyness: null });
   }
+
+  // Use availableQuestions (busyness-limited) instead of all questions
+  const questions = gameState.availableQuestions;
 
   // Get user's existing answers (only DB call that varies per-user)
   let answeredIds: string[] = [];
-  if (profile && gameState.questions.length > 0) {
+  if (profile && questions.length > 0) {
     const supabase = await createServerSupabase();
-    const qIds = gameState.questions.map((q) => q.id);
+    const qIds = questions.map((q) => q.id);
     const { data: answers } = await supabase
       .from("answers")
       .select("question_id")
@@ -41,13 +44,18 @@ export async function GET() {
   return NextResponse.json({
     unlocked: true,
     round: gameState.round,
-    questions: gameState.questions.map((q) => ({
+    questions: questions.map((q) => ({
       id: q.id,
       text: q.question,
       points: q.points,
       order: q.sort_order,
       answered: answeredIds.includes(q.id as string),
     })),
+    busyness: {
+      percent: gameState.busynessPercent,
+      questionsAllowed: gameState.questionsAllowed,
+      totalInRound: gameState.questions.length,
+    },
   });
 }
 
@@ -74,9 +82,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Already answered", isCorrect: existing.is_correct, points: existing.points });
   }
 
-  // Use cached questions instead of another DB call
+  // Verify question is in the available set (busyness-limited)
   const gameState = await getGameState();
-  const question = gameState.questions.find((q) => q.id === questionId);
+  const question = gameState.availableQuestions.find((q) => q.id === questionId);
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
   const isCorrect = normalize(answer) === normalize(question.answer as string);

@@ -22,6 +22,10 @@ export default function AdminPage() {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [tab, setTab] = useState<"game" | "rounds" | "questions" | "attendance">("game");
 
+  // Busyness
+  const [busyness, setBusyness] = useState<{ percent: number; questionsAllowed: number; label: string; source: string } | null>(null);
+  const [busyOverride, setBusyOverride] = useState("");
+
   // Attendance
   const [attendSearch, setAttendSearch] = useState("");
   const [attendPlayers, setAttendPlayers] = useState<{ id: string; display_name: string; total_points: number; games_played: number }[]>([]);
@@ -62,6 +66,11 @@ export default function AdminPage() {
       if (!selectedRoundId && adminData.rounds.length > 0) {
         setSelectedRoundId(adminData.rounds[0].id);
       }
+
+      // Load busyness
+      const busyRes = await fetch("/api/busyness");
+      const busyData = await busyRes.json();
+      setBusyness(busyData);
     } catch { router.push("/"); }
     finally { setLoading(false); }
   }, [router, selectedRoundId]);
@@ -220,6 +229,35 @@ export default function AdminPage() {
     } finally { setSaving(false); }
   };
 
+  const handleBusynessOverride = async () => {
+    const val = parseInt(busyOverride);
+    if (isNaN(val) || val < 0 || val > 100) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/busyness", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "override", percent: val }),
+      });
+      const data = await res.json();
+      setBusyness(data);
+      setBusyOverride("");
+    } finally { setSaving(false); }
+  };
+
+  const handleBusynessRefresh = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/busyness", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "refresh" }),
+      });
+      const data = await res.json();
+      setBusyness(data);
+    } finally { setSaving(false); }
+  };
+
   if (loading) return <div className="min-h-screen bg-banditos-dark flex items-center justify-center"><BanditosLogo size="md" /></div>;
   if (!isAdmin) return null;
 
@@ -303,6 +341,56 @@ export default function AdminPage() {
               >
                 Reset Answers (Active Round)
               </button>
+            </div>
+
+            {/* Busyness / Question Limiter */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-2">Busyness → Questions</h2>
+              <p className="text-white/40 text-sm mb-4">
+                Busier restaurant = fewer questions. Resets daily from Google data.
+              </p>
+
+              {busyness && (
+                <div className="bg-white/5 rounded-xl p-4 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-medium">{busyness.label}</span>
+                    <span className="text-banditos-gold font-bold">{busyness.percent}%</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden mb-2">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r transition-all ${busyness.percent < 25 ? "from-green-400 to-green-500" : busyness.percent < 50 ? "from-yellow-400 to-yellow-500" : busyness.percent < 75 ? "from-orange-400 to-orange-500" : "from-red-400 to-red-500"}`}
+                      style={{ width: `${busyness.percent}%` }}
+                    />
+                  </div>
+                  <p className="text-banditos-gold font-bold text-lg">{busyness.questionsAllowed} questions available</p>
+                  <p className="text-white/30 text-xs">Source: {busyness.source}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="number" min="0" max="100"
+                  placeholder="Override % (0-100)"
+                  value={busyOverride}
+                  onChange={(e) => setBusyOverride(e.target.value)}
+                  className="flex-1 bg-white/10 text-white rounded-xl px-4 py-2 placeholder-white/30 outline-none focus:ring-2 focus:ring-banditos-gold text-sm"
+                />
+                <button
+                  onClick={handleBusynessOverride}
+                  disabled={saving || !busyOverride}
+                  className="bg-banditos-gold text-banditos-dark px-4 py-2 rounded-xl font-bold text-sm disabled:opacity-40"
+                >
+                  Set
+                </button>
+                <button
+                  onClick={handleBusynessRefresh}
+                  disabled={saving}
+                  className="bg-white/10 text-white px-4 py-2 rounded-xl text-sm hover:bg-white/20"
+                >
+                  Refresh
+                </button>
+              </div>
+              <p className="text-white/20 text-xs">Override sets busyness manually until next daily reset or refresh.</p>
             </div>
           </>
         )}

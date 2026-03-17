@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 interface BusynessData {
   percent: number;
+  questionsAllowed: number;
   label: string;
   message: string;
 }

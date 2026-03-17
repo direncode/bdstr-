@@ -34,6 +34,7 @@ export default function PlayPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [round, setRound] = useState<RoundInfo | null>(null);
   const [questions, setQuestions] = useState<GameQuestion[]>([]);
+  const [busyness, setBusyness] = useState<{ percent: number; questionsAllowed: number; totalInRound: number } | null>(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answerText, setAnswerText] = useState("");
   const [result, setResult] = useState<AnswerResult | null>(null);
@@ -58,6 +59,7 @@ export default function PlayPage() {
         setUnlocked(d.unlocked);
         setRound(d.round);
         setQuestions(d.questions || []);
+        setBusyness(d.busyness || null);
         const first = (d.questions || []).findIndex((q: GameQuestion) => !q.answered);
         setCurrentIdx(first >= 0 ? first : 0);
       });
@@ -211,7 +213,26 @@ export default function PlayPage() {
               </div>
             </div>
           ) : (
-            <div className="text-center animate-slide-up">
+            <div className="text-center animate-slide-up space-y-4">
+              {busyness && (
+                <div className="bg-white/10 backdrop-blur rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white/80 text-sm font-medium">Bandidos Right Now</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/20 text-white font-medium">
+                      {busyness.percent < 20 ? "Quiet" : busyness.percent < 40 ? "Moderate" : busyness.percent < 60 ? "Busy" : busyness.percent < 80 ? "Very Busy" : "Packed"}
+                    </span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r transition-all duration-1000 ${busyness.percent < 25 ? "from-green-400 to-green-500" : busyness.percent < 50 ? "from-yellow-400 to-yellow-500" : busyness.percent < 75 ? "from-orange-400 to-orange-500" : "from-red-400 to-red-500"}`}
+                      style={{ width: `${busyness.percent}%` }}
+                    />
+                  </div>
+                  <p className="text-white/50 text-xs mt-2">
+                    {busyness.questionsAllowed} of {busyness.totalInRound} questions unlocked tonight
+                  </p>
+                </div>
+              )}
               <div className="bg-white/10 backdrop-blur rounded-2xl p-8">
                 <span className="text-6xl">🎯</span>
                 <h2 className="text-white text-xl font-bold mt-4">{round.name}</h2>

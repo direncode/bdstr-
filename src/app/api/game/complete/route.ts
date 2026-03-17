@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSession } from "@/lib/session";
+import { getGameState } from "@/lib/game-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -9,22 +10,14 @@ export async function POST() {
   const profile = await getSession();
   if (!profile) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
-  const { data: state } = await supabase
-    .from("game_state")
-    .select("*")
-    .eq("id", "singleton")
-    .maybeSingle();
-  if (!state?.active_round_id) return NextResponse.json({ error: "No active round" }, { status: 400 });
+  // Use availableQuestions (busyness-limited) for completion calc
+  const gameState = await getGameState();
+  if (!gameState.activeRoundId) return NextResponse.json({ error: "No active round" }, { status: 400 });
 
-  const { data: questions } = await supabase
-    .from("questions")
-    .select("id, sort_order")
-    .eq("round_id", state.active_round_id)
-    .order("sort_order");
+  const questions = gameState.availableQuestions;
+  if (!questions.length) return NextResponse.json({ error: "No questions" }, { status: 400 });
 
-  if (!questions) return NextResponse.json({ error: "No questions" }, { status: 400 });
-
-  const qIds = questions.map((q) => q.id);
+  const qIds = questions.map((q) => q.id as string);
   const { data: answers } = await supabase
     .from("answers")
     .select("*")
