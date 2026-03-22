@@ -121,7 +121,7 @@ export default function SplashPage() {
             </button>
             <button onClick={() => router.push("/wallet")}
               className="w-full bg-white/10 text-white/80 py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">
-              MY LOYALTY CARD
+              MY STATS
             </button>
             {profile.is_admin && (
               <button onClick={() => router.push("/admin")}

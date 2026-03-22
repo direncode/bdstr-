@@ -10,8 +10,6 @@ interface WalletData {
     id: string; name: string; points: number; gamesPlayed: number;
     bestStreak: number; rank: number; level: string; levelEmoji: string;
   };
-  googleSaveUrl: string | null;
-  googleConfigured: boolean;
   profileUrl: string;
 }
 
@@ -29,7 +27,7 @@ export default function WalletPage() {
         if (d.error) { setError(d.error); return; }
         setData(d);
       })
-      .catch(() => setError("Failed to load wallet data"))
+      .catch(() => setError("Failed to load card data"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -65,7 +63,7 @@ export default function WalletPage() {
       </div>
 
       <h1 className="text-center text-white text-2xl font-bold mb-2">Your Loyalty Card</h1>
-      <p className="text-center text-white/40 text-sm mb-8">Add to Google Wallet for quick access</p>
+      <p className="text-center text-white/40 text-sm mb-8">Your stats at a glance</p>
 
       <div className="max-w-sm mx-auto space-y-6">
         {/* Digital Card Preview */}
@@ -87,35 +85,9 @@ export default function WalletPage() {
             </div>
             <div className="text-right">
               <p className="text-white/40 text-xs">{profile.gamesPlayed} games</p>
-              <p className="text-white/40 text-xs">{profile.bestStreak} streak</p>
+              <p className="text-white/40 text-xs">{profile.bestStreak} best streak</p>
             </div>
           </div>
-        </div>
-
-        {/* Google Wallet */}
-        <div className="bg-white/10 backdrop-blur rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">💳</span>
-            <div>
-              <h3 className="text-white font-bold">Google Wallet</h3>
-              <p className="text-white/40 text-xs">Save your loyalty card to Google Wallet</p>
-            </div>
-          </div>
-          {data.googleConfigured && data.googleSaveUrl ? (
-            <a
-              href={data.googleSaveUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-white text-gray-900 py-3 rounded-xl font-medium text-center hover:bg-gray-100 transition-colors"
-            >
-              Save to Google Wallet
-            </a>
-          ) : (
-            <div className="bg-white/5 rounded-xl p-4">
-              <p className="text-white/50 text-sm">Google Wallet requires API setup.</p>
-              <p className="text-white/30 text-xs mt-1">See setup instructions below to enable Google Wallet integration.</p>
-            </div>
-          )}
         </div>
 
         {/* Share Profile */}
@@ -124,7 +96,7 @@ export default function WalletPage() {
             <span className="text-2xl">🔗</span>
             <div>
               <h3 className="text-white font-bold">Share Your Profile</h3>
-              <p className="text-white/40 text-xs">QR code on your card links here</p>
+              <p className="text-white/40 text-xs">Show off your stats to friends</p>
             </div>
           </div>
           <button
@@ -134,20 +106,6 @@ export default function WalletPage() {
             {copied ? "Copied!" : "Copy Profile Link"}
           </button>
         </div>
-
-        {/* Setup Instructions */}
-        {!data.googleConfigured && (
-          <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-            <h3 className="text-white font-bold mb-3">Google Wallet Setup</h3>
-            <ol className="text-white/40 text-xs space-y-1 list-decimal list-inside">
-              <li>Enable Google Wallet API in Cloud Console</li>
-              <li>Create a service account with Wallet Writer role</li>
-              <li>Get Issuer ID from pay.google.com/business/console</li>
-              <li>Set env vars: GOOGLE_WALLET_ISSUER_ID, service account email + key</li>
-            </ol>
-          </div>
-        )}
-
       </div>
 
       <BottomNav />

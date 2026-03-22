@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSession } from "@/lib/session";
-import { generateGoogleWalletSaveUrl, type PassData } from "@/lib/wallet";
 import { getLevel } from "@/lib/levels";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/wallet — get wallet card data + save URLs for current user
+// GET /api/wallet — get loyalty card data for current user
 export async function GET() {
   const profile = await getSession();
   if (!profile) return NextResponse.json({ error: "Login required" }, { status: 401 });
@@ -24,29 +23,6 @@ export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://bandidostrivia.com";
   const level = getLevel(profile.total_points);
 
-  const passData: PassData = {
-    serialNumber: profile.id,
-    playerName: profile.display_name,
-    points: profile.total_points,
-    rank,
-    level: level.name,
-    levelEmoji: level.emoji,
-    profileUrl: `${baseUrl}/profile?id=${profile.id}`,
-  };
-
-  // Generate wallet card ID if not exists
-  if (!profile.wallet_card_id) {
-    const cardId = `banditos_${profile.id.slice(0, 8)}`;
-    await supabase
-      .from("profiles")
-      .update({ wallet_card_id: cardId })
-      .eq("id", profile.id);
-  }
-
-  // Google Wallet save URL (null if not configured)
-  const googleSaveUrl = generateGoogleWalletSaveUrl(passData);
-  const googleConfigured = !!process.env.GOOGLE_WALLET_ISSUER_ID;
-
   return NextResponse.json({
     profile: {
       id: profile.id,
@@ -58,8 +34,6 @@ export async function GET() {
       level: level.name,
       levelEmoji: level.emoji,
     },
-    googleSaveUrl,
-    googleConfigured,
-    profileUrl: passData.profileUrl,
+    profileUrl: `${baseUrl}/profile?id=${profile.id}`,
   });
 }
