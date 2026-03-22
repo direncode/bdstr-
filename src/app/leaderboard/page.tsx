@@ -20,11 +20,17 @@ export default function LeaderboardPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   useEffect(() => {
-    fetch("/api/leaderboard")
-      .then((r) => r.json())
-      .then((d) => setPlayers(d.leaderboard))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    const fetchLeaderboard = () => {
+      fetch("/api/leaderboard")
+        .then((r) => r.json())
+        .then((d) => setPlayers(d.leaderboard))
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    };
+
+    fetchLeaderboard();
+    const interval = setInterval(fetchLeaderboard, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const podium = players.slice(0, 3);
@@ -106,14 +112,16 @@ function PodiumCard({ player, rank, height }: { player: Player; rank: number; he
   const level = getLevel(player.total_points);
   const medals = ["", "🥇", "🥈", "🥉"];
   const bgColors = ["", "from-yellow-500/30 to-yellow-600/10", "from-gray-400/20 to-gray-500/10", "from-amber-700/20 to-amber-800/10"];
+  const isTitan = rank === 1;
 
   return (
-    <div className={`flex-1 max-w-[140px] bg-gradient-to-b ${bgColors[rank]} backdrop-blur border border-white/10 rounded-2xl p-3 ${height} flex flex-col items-center justify-end`}>
+    <div className={`flex-1 max-w-[140px] bg-gradient-to-b ${bgColors[rank]} backdrop-blur border ${isTitan ? "border-banditos-gold/50" : "border-white/10"} rounded-2xl p-3 ${height} flex flex-col items-center justify-end`}>
+      {isTitan && <span className="text-xs font-bold text-banditos-gold tracking-wide animate-pulse">TRIVIA TITAN</span>}
       <span className="text-3xl">{medals[rank]}</span>
       <span className="text-lg mt-1">{level.emoji}</span>
       <p className="text-white font-bold text-sm text-center mt-1 truncate w-full">{player.display_name}</p>
       <p className="text-banditos-gold font-bold text-lg">{player.total_points}</p>
-      <p className="text-white/40 text-xs">{level.name}</p>
+      <p className="text-white/40 text-xs">{isTitan ? "Trivia Titan" : level.name}</p>
     </div>
   );
 }

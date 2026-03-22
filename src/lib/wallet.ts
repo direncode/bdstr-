@@ -1,22 +1,6 @@
 import jwt from "jsonwebtoken";
 import { getLevel } from "./levels";
 
-// ============================================================
-// Apple Wallet PKPass Generation
-// ============================================================
-// Apple Wallet requires a signed .pkpass bundle (ZIP of JSON + images).
-// For MVP, we generate the pass.json structure. Full signing requires:
-// 1. Apple Developer Account ($99/year)
-// 2. Pass Type ID certificate from developer.apple.com
-// 3. WWDR intermediate certificate
-//
-// Set these env vars for production:
-//   APPLE_PASS_TYPE_ID=pass.com.bandidostrivia.loyalty
-//   APPLE_TEAM_ID=YOUR_TEAM_ID
-//   APPLE_PASS_CERT_PATH=/path/to/pass-cert.pem
-//   APPLE_PASS_KEY_PATH=/path/to/pass-key.pem
-//   APPLE_WWDR_CERT_PATH=/path/to/wwdr.pem
-
 export interface PassData {
   serialNumber: string;
   playerName: string;
@@ -25,69 +9,6 @@ export interface PassData {
   level: string;
   levelEmoji: string;
   profileUrl: string;
-}
-
-export function generateApplePassJson(data: PassData) {
-  return {
-    formatVersion: 1,
-    passTypeIdentifier: process.env.APPLE_PASS_TYPE_ID || "pass.com.bandidostrivia.loyalty",
-    serialNumber: data.serialNumber,
-    teamIdentifier: process.env.APPLE_TEAM_ID || "PLACEHOLDER",
-    organizationName: "Bandidos Trivia",
-    description: "Bandidos Trivia Loyalty Card",
-    logoText: "Bandidos Trivia",
-    foregroundColor: "rgb(255, 255, 255)",
-    backgroundColor: "rgb(196, 30, 58)",
-    labelColor: "rgb(255, 215, 0)",
-    generic: {
-      primaryFields: [
-        {
-          key: "points",
-          label: "POINTS",
-          value: data.points,
-          changeMessage: "Your points are now %@",
-        },
-      ],
-      secondaryFields: [
-        {
-          key: "level",
-          label: "LEVEL",
-          value: `${data.levelEmoji} ${data.level}`,
-        },
-        {
-          key: "rank",
-          label: "RANK",
-          value: `#${data.rank}`,
-        },
-      ],
-      auxiliaryFields: [
-        {
-          key: "name",
-          label: "PLAYER",
-          value: data.playerName,
-        },
-      ],
-      backFields: [
-        {
-          key: "info",
-          label: "About Bandidos Trivia",
-          value: "Live trivia every week at Bandidos Mexican Cafe on Franklin St, Chapel Hill NC. Earn points, climb the leaderboard, and become a legend!",
-        },
-      ],
-    },
-    barcode: {
-      message: data.profileUrl,
-      format: "PKBarcodeFormatQR",
-      messageEncoding: "iso-8859-1",
-    },
-    barcodes: [
-      {
-        message: data.profileUrl,
-        format: "PKBarcodeFormatQR",
-        messageEncoding: "iso-8859-1",
-      },
-    ],
-  };
 }
 
 // ============================================================

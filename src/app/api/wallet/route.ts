@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSession } from "@/lib/session";
-import { generateApplePassJson, generateGoogleWalletSaveUrl, type PassData } from "@/lib/wallet";
+import { generateGoogleWalletSaveUrl, type PassData } from "@/lib/wallet";
 import { getLevel } from "@/lib/levels";
 
 export const dynamic = "force-dynamic";
@@ -43,14 +43,8 @@ export async function GET() {
       .eq("id", profile.id);
   }
 
-  // Apple pass JSON (not signed — needs cert for actual .pkpass)
-  const applePass = generateApplePassJson(passData);
-
   // Google Wallet save URL (null if not configured)
   const googleSaveUrl = generateGoogleWalletSaveUrl(passData);
-
-  // Check if wallets are configured
-  const appleConfigured = !!(process.env.APPLE_PASS_TYPE_ID && process.env.APPLE_TEAM_ID);
   const googleConfigured = !!process.env.GOOGLE_WALLET_ISSUER_ID;
 
   return NextResponse.json({
@@ -64,8 +58,6 @@ export async function GET() {
       level: level.name,
       levelEmoji: level.emoji,
     },
-    applePass,
-    appleConfigured,
     googleSaveUrl,
     googleConfigured,
     profileUrl: passData.profileUrl,
