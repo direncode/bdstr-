@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 import { BusynessBar } from "@/components/BusynessBar";
+import { BottomNav } from "@/components/BottomNav";
 
 export default function SplashPage() {
   const router = useRouter();
@@ -15,11 +16,16 @@ export default function SplashPage() {
   const [checkingIn, setCheckingIn] = useState(false);
   const [justCheckedIn, setJustCheckedIn] = useState(false);
 
+  // Admin key
+  const [showAdminKey, setShowAdminKey] = useState(false);
+  const [adminKey, setAdminKey] = useState("");
+  const [adminKeyError, setAdminKeyError] = useState("");
+  const [adminKeySuccess, setAdminKeySuccess] = useState(false);
+
   useEffect(() => {
     setTimeout(() => setShow(true), 200);
     fetch("/api/auth").then((r) => r.json()).then((d) => {
       setProfile(d.profile);
-      // Only check trivia night if logged in
       if (d.profile) {
         fetch("/api/trivia-night").then(r => r.json()).then(setTriviaNight).catch(() => {});
       }
@@ -43,8 +49,31 @@ export default function SplashPage() {
     setCheckingIn(false);
   };
 
+  const handleAdminKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminKeyError("");
+    try {
+      const res = await fetch("/api/admin-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: adminKey }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminKeySuccess(true);
+        setProfile((prev) => prev ? { ...prev, is_admin: true } : prev);
+        setTimeout(() => { setShowAdminKey(false); setAdminKeySuccess(false); }, 1500);
+      } else {
+        setAdminKeyError(data.error || "Invalid key");
+      }
+    } catch {
+      setAdminKeyError("Network error");
+    }
+    setAdminKey("");
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark via-[#2a1a3e] to-banditos-dark flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-b from-banditos-dark via-[#2a1a3e] to-banditos-dark flex flex-col items-center justify-center px-4 pb-20">
       <div className={`transition-all duration-1000 ${show ? "opacity-100 scale-100" : "opacity-0 scale-75"}`}>
         <BanditosLogo size="xl" />
       </div>
@@ -96,9 +125,45 @@ export default function SplashPage() {
             </button>
             {profile.is_admin && (
               <button onClick={() => router.push("/admin")}
-                className="w-full bg-white/10 text-white/80 py-3 rounded-2xl font-medium border border-white/20 hover:bg-white/20 transition-colors">
-                Admin Panel
+                className="w-full bg-purple-600/30 text-purple-300 py-3 rounded-2xl font-bold border border-purple-500/40 hover:bg-purple-600/40 transition-colors">
+                ⚙️ Admin Panel
               </button>
+            )}
+
+            {/* Admin key entry */}
+            {!profile.is_admin && (
+              <div className="mt-2">
+                {!showAdminKey ? (
+                  <button
+                    onClick={() => setShowAdminKey(true)}
+                    className="w-full text-white/20 text-xs py-2 hover:text-white/40 transition-colors"
+                  >
+                    Staff? Enter admin key
+                  </button>
+                ) : (
+                  <form onSubmit={handleAdminKey} className="space-y-2 animate-slide-up">
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={adminKey}
+                        onChange={(e) => setAdminKey(e.target.value)}
+                        placeholder="Admin key..."
+                        autoFocus
+                        className="flex-1 px-3 py-2 rounded-xl bg-white/10 text-white text-sm placeholder-white/30 border border-white/20 focus:border-purple-400 outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-purple-600/50 text-purple-200 rounded-xl text-sm font-medium hover:bg-purple-600/70 transition-colors"
+                      >
+                        Go
+                      </button>
+                    </div>
+                    {adminKeyError && <p className="text-red-400 text-xs text-center">{adminKeyError}</p>}
+                    {adminKeySuccess && <p className="text-green-400 text-xs text-center font-bold">Admin access granted!</p>}
+                    <button type="button" onClick={() => setShowAdminKey(false)} className="w-full text-white/20 text-xs hover:text-white/40">Cancel</button>
+                  </form>
+                )}
+              </div>
             )}
           </>
         ) : (
@@ -130,9 +195,11 @@ export default function SplashPage() {
         <BusynessBar />
       </div>
 
-      <p className="absolute bottom-6 text-white/30 text-xs">
+      <p className="mt-6 text-white/30 text-xs">
         Bandidos Mexican Cafe &middot; Franklin St, Chapel Hill NC
       </p>
+
+      {profile && <BottomNav isAdmin={profile.is_admin} />}
     </div>
   );
 }

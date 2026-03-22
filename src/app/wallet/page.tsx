@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
+import { BottomNav } from "@/components/BottomNav";
 
 interface WalletData {
   profile: {
@@ -55,7 +56,7 @@ export default function WalletPage() {
   const { profile } = data;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white">← Back</button>
@@ -147,12 +148,9 @@ export default function WalletPage() {
           </div>
         )}
 
-        <div className="flex justify-center gap-3 pb-6">
-          <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Leaderboard</button>
-          <span className="text-white/20">|</span>
-          <button onClick={() => router.push("/play")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Play</button>
-        </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

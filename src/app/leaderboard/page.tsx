@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
+import { BottomNav } from "@/components/BottomNav";
 import { getLevel, getNextLevel, getLevelProgress, LEVELS } from "@/lib/levels";
 
 interface Player {
@@ -18,6 +19,7 @@ export default function LeaderboardPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchLeaderboard = () => {
@@ -29,6 +31,7 @@ export default function LeaderboardPage() {
     };
 
     fetchLeaderboard();
+    fetch("/api/auth").then(r => r.json()).then(d => { if (d.profile?.is_admin) setIsAdmin(true); }).catch(() => {});
     const interval = setInterval(fetchLeaderboard, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -37,7 +40,7 @@ export default function LeaderboardPage() {
   const rest = players.slice(3);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e]">
+    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] pb-20">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white">
@@ -104,6 +107,8 @@ export default function LeaderboardPage() {
       {selectedPlayer && (
         <PlayerModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
       )}
+
+      <BottomNav isAdmin={isAdmin} />
     </div>
   );
 }

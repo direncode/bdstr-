@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
+import { BottomNav } from "@/components/BottomNav";
 
 interface Question {
   id: string; question: string; answer: string;
@@ -363,7 +364,7 @@ export default function AdminPage() {
   const currentRoundQuestions = rounds.find((r) => r.id === selectedRoundId)?.questions || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24">
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white">← Back</button>
         <BanditosLogo size="sm" />
@@ -1031,10 +1032,12 @@ export default function AdminPage() {
       </div>
 
       {saving && (
-        <div className="fixed bottom-4 right-4 bg-banditos-gold text-black px-4 py-2 rounded-xl text-sm font-medium animate-pulse">
+        <div className="fixed bottom-20 right-4 bg-banditos-gold text-black px-4 py-2 rounded-xl text-sm font-medium animate-pulse">
           Saving...
         </div>
       )}
+
+      <BottomNav isAdmin={true} />
     </div>
   );
 }
