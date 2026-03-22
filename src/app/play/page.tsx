@@ -288,7 +288,7 @@ export default function PlayPage() {
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6 mb-6">
             <p className="text-white text-xl font-bold leading-relaxed">{q.text}</p>
             <p className="text-banditos-gold/60 text-sm mt-2">
-              {q.points} points{hasQrBonus && <span className="text-green-400 ml-1">(2x = {q.points * 2})</span>}
+              1 point{hasQrBonus && <span className="text-green-400 ml-1">(2x = 2 pts)</span>}
             </p>
           </div>
 

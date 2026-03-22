@@ -22,21 +22,22 @@ create index if not exists idx_profiles_session_token on profiles(session_token)
 -- Index for fast display_name lookups (login)
 create index if not exists idx_profiles_display_name on profiles(display_name);
 
--- 2. ROUNDS
+-- 2. ROUNDS (can be scheduled to specific dates for weekly planning)
 create table if not exists rounds (
   id uuid default gen_random_uuid() primary key,
   name text not null,
   category text not null,
-  sort_order int default 0
+  sort_order int default 0,
+  scheduled_date date  -- NULL = unscheduled, set to a date to auto-activate that day
 );
 
--- 3. QUESTIONS (text-based: question + answer)
+-- 3. QUESTIONS (text-based: question + answer, 1 point each)
 create table if not exists questions (
   id uuid default gen_random_uuid() primary key,
   round_id uuid references rounds(id) on delete cascade,
   question text not null,
   answer text not null,
-  points int default 10,
+  points int default 1,
   sort_order int default 0
 );
 

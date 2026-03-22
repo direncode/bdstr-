@@ -67,10 +67,11 @@ export async function GET() {
     questions: questions.map((q) => ({
       id: q.id,
       text: q.question,
-      points: q.points,
+      points: 1,
       order: q.sort_order,
       answered: answeredIds.includes(q.id as string),
     })),
+    todaysRounds: gameState.todaysRounds,
     busyness: {
       percent: gameState.busynessPercent,
       questionsAllowed: hasQr ? gameState.questions.length : gameState.questionsAllowed,
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
   const isCorrect = normalize(answer) === normalize(question.answer as string);
-  const points = isCorrect ? (question.points as number) : 0;
+  const points = isCorrect ? 1 : 0;
 
   // Save answer
   const { error: ansError } = await supabase.from("answers").insert({

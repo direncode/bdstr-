@@ -11,6 +11,7 @@ interface Question {
 }
 interface Round {
   id: string; name: string; category: string; sort_order: number;
+  scheduled_date: string | null;
   questions: Question[];
 }
 
@@ -397,27 +398,56 @@ function AdminContent() {
             </div>
 
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
-              <h2 className="text-white font-bold text-lg mb-4">Active Round</h2>
-              <div className="space-y-2">
-                <button
-                  onClick={() => doAction("set-round", { roundId: "" })}
-                  disabled={saving}
-                  className={`w-full p-3 rounded-xl text-left transition-colors ${!activeRoundId ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
-                >
-                  None (waiting room)
-                </button>
-                {rounds.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => doAction("set-round", { roundId: r.id })}
-                    disabled={saving}
-                    className={`w-full p-3 rounded-xl text-left transition-colors ${activeRoundId === r.id ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
-                  >
-                    <span className="font-medium">{r.name}</span>
-                    <span className="text-xs ml-2 opacity-60">{r.questions.length} questions</span>
-                  </button>
-                ))}
-              </div>
+              <h2 className="text-white font-bold text-lg mb-2">Active Round</h2>
+              {(() => {
+                const today = new Date().toISOString().split("T")[0];
+                const todaysRounds = rounds.filter((r) => r.scheduled_date === today);
+                const otherRounds = rounds.filter((r) => r.scheduled_date !== today);
+                return (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => doAction("set-round", { roundId: "" })}
+                      disabled={saving}
+                      className={`w-full p-3 rounded-xl text-left transition-colors ${!activeRoundId ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+                    >
+                      None (waiting room)
+                    </button>
+                    {todaysRounds.length > 0 && (
+                      <>
+                        <p className="text-banditos-gold text-xs font-bold uppercase tracking-wider pt-2">Today&apos;s Rounds</p>
+                        {todaysRounds.map((r) => (
+                          <button
+                            key={r.id}
+                            onClick={() => doAction("set-round", { roundId: r.id })}
+                            disabled={saving}
+                            className={`w-full p-3 rounded-xl text-left transition-colors border ${activeRoundId === r.id ? "bg-banditos-red text-white border-banditos-red" : "bg-banditos-gold/10 text-white border-banditos-gold/30 hover:bg-banditos-gold/20"}`}
+                          >
+                            <span className="font-medium">{r.name}</span>
+                            <span className="text-xs ml-2 opacity-60">{r.questions.length} Q&apos;s — 1 pt each</span>
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    {otherRounds.length > 0 && (
+                      <>
+                        {todaysRounds.length > 0 && <p className="text-white/30 text-xs font-bold uppercase tracking-wider pt-2">All Rounds</p>}
+                        {otherRounds.map((r) => (
+                          <button
+                            key={r.id}
+                            onClick={() => doAction("set-round", { roundId: r.id })}
+                            disabled={saving}
+                            className={`w-full p-3 rounded-xl text-left transition-colors ${activeRoundId === r.id ? "bg-banditos-red text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+                          >
+                            <span className="font-medium">{r.name}</span>
+                            <span className="text-xs ml-2 opacity-60">{r.questions.length} Q&apos;s — 1 pt each</span>
+                            {r.scheduled_date && <span className="text-xs ml-2 text-banditos-gold/60">{new Date(r.scheduled_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
@@ -486,6 +516,62 @@ function AdminContent() {
         {/* ==================== ROUNDS TAB ==================== */}
         {tab === "rounds" && (
           <>
+            {/* Weekly Schedule View */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-2">Weekly Schedule</h2>
+              <p className="text-white/40 text-sm mb-4">Schedule unlimited rounds per day. Drag dates to plan the whole week ahead.</p>
+              <div className="space-y-2">
+                {(() => {
+                  const today = new Date();
+                  const days: { date: string; label: string; dayName: string; isToday: boolean }[] = [];
+                  for (let i = 0; i < 7; i++) {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() + i);
+                    const dateStr = d.toISOString().split("T")[0];
+                    days.push({
+                      date: dateStr,
+                      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                      dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
+                      isToday: i === 0,
+                    });
+                  }
+                  return days.map((day) => {
+                    const dayRounds = rounds.filter((r) => r.scheduled_date === day.date);
+                    return (
+                      <div key={day.date} className={`rounded-xl p-3 ${day.isToday ? "bg-banditos-gold/10 border border-banditos-gold/30" : "bg-white/5 border border-white/5"}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold text-sm ${day.isToday ? "text-banditos-gold" : "text-white/70"}`}>{day.dayName}</span>
+                            <span className="text-white/40 text-xs">{day.label}</span>
+                            {day.isToday && <span className="text-xs bg-banditos-gold/20 text-banditos-gold px-2 py-0.5 rounded-full font-bold">TODAY</span>}
+                          </div>
+                          <span className="text-white/30 text-xs">{dayRounds.length} round{dayRounds.length !== 1 ? "s" : ""}</span>
+                        </div>
+                        {dayRounds.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {dayRounds.map((r) => (
+                              <span key={r.id} className="text-xs bg-banditos-red/20 text-banditos-red px-2 py-1 rounded-lg inline-flex items-center gap-1">
+                                {r.name}
+                                <button
+                                  onClick={() => doAction("schedule-round", { roundId: r.id, date: "" })}
+                                  disabled={saving}
+                                  className="text-red-400/60 hover:text-red-400 ml-0.5"
+                                  title="Unschedule"
+                                >x</button>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-white/20 text-xs mt-1">No rounds scheduled</p>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Add New Round */}
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
               <h2 className="text-white font-bold text-lg mb-4">Add New Round</h2>
               <div className="space-y-3">
@@ -509,8 +595,10 @@ function AdminContent() {
               </div>
             </div>
 
+            {/* All Rounds with Scheduling */}
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
-              <h2 className="text-white font-bold text-lg mb-4">Existing Rounds ({rounds.length})</h2>
+              <h2 className="text-white font-bold text-lg mb-4">All Rounds ({rounds.length})</h2>
+              <p className="text-white/30 text-xs mb-3">Assign a date to schedule rounds. You can schedule unlimited rounds per day.</p>
               {rounds.length === 0 ? (
                 <p className="text-white/40 text-center py-4">No rounds yet. Add one above!</p>
               ) : (
@@ -535,15 +623,40 @@ function AdminContent() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-white font-medium">{r.name}</p>
-                            <p className="text-white/40 text-xs">{r.category} — {r.questions.length} questions</p>
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-white font-medium">{r.name}</p>
+                              <p className="text-white/40 text-xs">{r.category} — {r.questions.length} questions — 1 pt each</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => setEditingRound(r)} className="text-xs bg-white/10 text-white/60 px-3 py-1.5 rounded-lg hover:bg-white/20">Edit</button>
+                              <button onClick={() => handleDeleteRound(r.id, r.name)} disabled={saving} className="text-xs bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/30">Delete</button>
+                            </div>
                           </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => setEditingRound(r)} className="text-xs bg-white/10 text-white/60 px-3 py-1.5 rounded-lg hover:bg-white/20">Edit</button>
-                            <button onClick={() => handleDeleteRound(r.id, r.name)} disabled={saving} className="text-xs bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/30">Delete</button>
+                          <div className="mt-2 flex items-center gap-2">
+                            <label className="text-white/30 text-xs shrink-0">Schedule:</label>
+                            <input
+                              type="date"
+                              value={r.scheduled_date || ""}
+                              onChange={(e) => doAction("schedule-round", { roundId: r.id, date: e.target.value })}
+                              className="flex-1 bg-white/10 text-white rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-banditos-gold [color-scheme:dark]"
+                            />
+                            {r.scheduled_date && (
+                              <button
+                                onClick={() => doAction("schedule-round", { roundId: r.id, date: "" })}
+                                disabled={saving}
+                                className="text-xs text-orange-400 hover:text-orange-300"
+                              >
+                                Clear
+                              </button>
+                            )}
                           </div>
+                          {r.scheduled_date && (
+                            <p className="text-banditos-gold/60 text-xs mt-1">
+                              Scheduled for {new Date(r.scheduled_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

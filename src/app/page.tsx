@@ -261,7 +261,7 @@ export default function HomePage() {
                         }`}
                       >
                         <span>{r.name}</span>
-                        <span className="text-xs ml-2 opacity-60">{r.questions.length} Q&apos;s &middot; {r.category}</span>
+                        <span className="text-xs ml-2 opacity-60">{r.questions.length} Q&apos;s &middot; 1 pt each</span>
                       </button>
                     ))}
                   </div>

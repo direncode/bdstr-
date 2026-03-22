@@ -80,9 +80,22 @@ export async function POST(req: Request) {
   }
 
   if (body.action === "edit-round") {
-    const { roundId, name, category } = body;
+    const { roundId, name, category, scheduled_date } = body;
     if (!roundId) return NextResponse.json({ error: "roundId required" }, { status: 400 });
-    const { error: updateErr } = await supabase.from("rounds").update({ name, category }).eq("id", roundId);
+    const updates: Record<string, unknown> = {};
+    if (name !== undefined) updates.name = name;
+    if (category !== undefined) updates.category = category;
+    if (scheduled_date !== undefined) updates.scheduled_date = scheduled_date || null;
+    const { error: updateErr } = await supabase.from("rounds").update(updates).eq("id", roundId);
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Schedule a round to a specific date
+  if (body.action === "schedule-round") {
+    const { roundId, date } = body;
+    if (!roundId) return NextResponse.json({ error: "roundId required" }, { status: 400 });
+    const { error: updateErr } = await supabase.from("rounds").update({ scheduled_date: date || null }).eq("id", roundId);
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
@@ -113,7 +126,7 @@ export async function POST(req: Request) {
   if (body.action === "edit-question") {
     const { questionId, ...fields } = body;
     if (!questionId) return NextResponse.json({ error: "questionId required" }, { status: 400 });
-    const allowed = ["question", "answer", "round_id", "sort_order", "points"];
+    const allowed = ["question", "answer", "round_id", "sort_order"];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (fields[key] !== undefined) updates[key] = fields[key];
