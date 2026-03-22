@@ -15,13 +15,14 @@ interface GameComplete {
   bonusPoints: number; maxStreak: number; perfectRound: boolean;
 }
 
-type Screen = "auth" | "gate" | "playing" | "result" | "complete";
+type Screen = "auth" | "scan-required" | "gate" | "playing" | "result" | "complete";
 
 export default function PlayPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<Screen>("auth");
   const [loading, setLoading] = useState(true);
+  const [qrVerified, setQrVerified] = useState(false);
 
   // Auth
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
@@ -43,11 +44,30 @@ export default function PlayPage() {
   const [streak, setStreak] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Check if already logged in
+  // Check if already logged in and has valid QR session
   useEffect(() => {
+    const qrCode = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
+
     fetch("/api/auth")
       .then((r) => r.json())
-      .then((d) => { if (d.profile) { setProfile(d.profile); setScreen("gate"); } })
+      .then(async (d) => {
+        if (d.profile) {
+          setProfile(d.profile);
+          // Verify QR session
+          if (qrCode) {
+            const qrRes = await fetch(`/api/qr-sessions?code=${qrCode}`);
+            const qrData = await qrRes.json();
+            if (!qrData.error && qrData.claimedBy === d.profile.id) {
+              setQrVerified(true);
+              setScreen("gate");
+            } else {
+              setScreen("scan-required");
+            }
+          } else {
+            setScreen("scan-required");
+          }
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -102,7 +122,20 @@ export default function PlayPage() {
 
       if (data.profile) {
         setProfile(data.profile);
-        setScreen("gate");
+        // Check QR session after auth
+        const qrCode = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
+        if (qrCode) {
+          const qrRes = await fetch(`/api/qr-sessions?code=${qrCode}`);
+          const qrData = await qrRes.json();
+          if (!qrData.error && qrData.claimedBy === data.profile.id) {
+            setQrVerified(true);
+            setScreen("gate");
+          } else {
+            setScreen("scan-required");
+          }
+        } else {
+          setScreen("scan-required");
+        }
       } else {
         setAuthError("Account created but profile not ready. Please try logging in.");
       }
@@ -183,6 +216,35 @@ export default function PlayPage() {
         </div>
 
         <button onClick={() => router.push("/")} className="mt-6 text-white/40 text-sm hover:text-white/60">← Back</button>
+      </div>
+    );
+  }
+
+  // ============ SCAN REQUIRED ============
+  if (screen === "scan-required") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+        <BanditosLogo size="lg" />
+        <div className="mt-8 w-full max-w-sm">
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
+            <span className="text-6xl">📱</span>
+            <h2 className="text-white text-xl font-bold mt-4">Scan a QR Code to Play</h2>
+            <p className="text-white/60 mt-2">
+              Find a QR code at Bandidos and scan it with your phone camera to join tonight&apos;s trivia!
+            </p>
+            <div className="mt-6 bg-white/5 rounded-xl p-4 border border-white/10">
+              <p className="text-banditos-gold text-sm font-medium">Look for QR codes on:</p>
+              <p className="text-white/40 text-xs mt-1">Tables, the bar counter, or at the entrance</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 flex gap-3 items-center">
+          <span className="text-white/50 text-sm">{profile?.display_name}</span>
+          <span className="text-white/20">|</span>
+          <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Leaderboard</button>
+          <span className="text-white/20">|</span>
+          <button onClick={handleSignOut} className="text-white/40 text-sm hover:text-white/60">Logout</button>
+        </div>
       </div>
     );
   }

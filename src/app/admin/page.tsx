@@ -20,7 +20,7 @@ export default function AdminPage() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
-  const [tab, setTab] = useState<"game" | "rounds" | "questions" | "attendance">("game");
+  const [tab, setTab] = useState<"game" | "rounds" | "questions" | "attendance" | "qrcodes">("game");
 
   // Busyness
   const [busyness, setBusyness] = useState<{ percent: number; questionsAllowed: number; label: string; source: string } | null>(null);
@@ -32,6 +32,12 @@ export default function AdminPage() {
   const [attendLogs, setAttendLogs] = useState<{ id: string; player_name: string; points_added: number; note: string; created_at: string }[]>([]);
   const [attendLoading, setAttendLoading] = useState(false);
   const [doubleResult, setDoubleResult] = useState<{ playerName: string; pointsAdded: number; newTotal: number } | null>(null);
+
+  // QR Sessions
+  const [qrSessions, setQrSessions] = useState<{ id: string; code: string; name: string; claimed_by: string | null; claimed_name: string | null; claimed_at: string | null; is_active: boolean }[]>([]);
+  const [newQrName, setNewQrName] = useState("");
+  const [newQrCount, setNewQrCount] = useState("1");
+  const [qrLoading, setQrLoading] = useState(false);
 
   // Round form
   const [newRoundName, setNewRoundName] = useState("");
@@ -229,6 +235,41 @@ export default function AdminPage() {
     } finally { setSaving(false); }
   };
 
+  const loadQrSessions = async () => {
+    setQrLoading(true);
+    try {
+      const res = await fetch("/api/qr-sessions");
+      const data = await res.json();
+      setQrSessions(data.sessions || []);
+    } finally { setQrLoading(false); }
+  };
+
+  const handleCreateQr = async () => {
+    if (!newQrName.trim()) return;
+    setSaving(true);
+    try {
+      await fetch("/api/qr-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", name: newQrName.trim(), count: parseInt(newQrCount) || 1 }),
+      });
+      setNewQrName(""); setNewQrCount("1");
+      await loadQrSessions();
+    } finally { setSaving(false); }
+  };
+
+  const handleQrAction = async (action: string, sessionId?: string, extra: Record<string, boolean> = {}) => {
+    setSaving(true);
+    try {
+      await fetch("/api/qr-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, sessionId, ...extra }),
+      });
+      await loadQrSessions();
+    } finally { setSaving(false); }
+  };
+
   const handleBusynessOverride = async () => {
     const val = parseInt(busyOverride);
     if (isNaN(val) || val < 0 || val > 100) return;
@@ -275,13 +316,13 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
-        {(["game", "rounds", "questions", "attendance"] as const).map((t) => (
+        {(["game", "rounds", "questions", "attendance", "qrcodes"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => { setTab(t); if (t === "attendance") loadAttendanceLogs(); }}
+            onClick={() => { setTab(t); if (t === "attendance") loadAttendanceLogs(); if (t === "qrcodes") loadQrSessions(); }}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${tab === t ? "bg-banditos-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
           >
-            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : "Attendance"}
+            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "attendance" ? "Attendance" : "QR Codes"}
           </button>
         ))}
       </div>
@@ -675,6 +716,119 @@ export default function AdminPage() {
                       <div className="text-right">
                         <p className="text-green-400 font-bold text-sm">+{log.points_added}</p>
                         <p className="text-white/20 text-xs">{new Date(log.created_at).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ==================== QR CODES TAB ==================== */}
+        {tab === "qrcodes" && (
+          <>
+            {/* Create QR Codes */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-2">Create QR Codes</h2>
+              <p className="text-white/40 text-sm mb-4">Generate named QR codes for tables, bar, entrance, etc. Players must scan to play.</p>
+              <div className="space-y-3">
+                <input
+                  type="text" placeholder="Name (e.g. Table 1, Bar, Front Door)"
+                  value={newQrName} onChange={(e) => setNewQrName(e.target.value)}
+                  className="w-full bg-white/10 text-white rounded-xl px-4 py-3 placeholder-white/30 outline-none focus:ring-2 focus:ring-banditos-gold"
+                />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-white/30 text-xs">How many?</label>
+                    <input
+                      type="number" min="1" max="50" value={newQrCount}
+                      onChange={(e) => setNewQrCount(e.target.value)}
+                      className="w-full bg-white/10 text-white rounded-xl px-4 py-3 placeholder-white/30 outline-none focus:ring-2 focus:ring-banditos-gold"
+                    />
+                  </div>
+                  <button
+                    onClick={handleCreateQr}
+                    disabled={saving || !newQrName.trim()}
+                    className="self-end bg-banditos-green text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                  >
+                    + Create
+                  </button>
+                </div>
+                <p className="text-white/20 text-xs">If count &gt; 1, codes are numbered (e.g. &quot;Table 1&quot;, &quot;Table 2&quot;...)</p>
+              </div>
+            </div>
+
+            {/* Reset All */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-white font-bold text-lg">Reset All Claims</h2>
+                  <p className="text-white/40 text-sm">Unclaim all QR codes for a new game night</p>
+                </div>
+                <button
+                  onClick={() => { if (confirm("Reset all QR claims? Players will need to re-scan.")) handleQrAction("reset-all"); }}
+                  disabled={saving}
+                  className="bg-orange-600 text-white px-5 py-3 rounded-xl font-medium hover:bg-orange-700 transition-colors disabled:opacity-40"
+                >
+                  Reset All
+                </button>
+              </div>
+            </div>
+
+            {/* Active QR Sessions */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-4">
+                QR Codes ({qrSessions.length})
+                <span className="text-white/40 text-sm font-normal ml-2">
+                  {qrSessions.filter(s => s.claimed_by).length} claimed
+                </span>
+              </h2>
+
+              {qrLoading ? (
+                <p className="text-white/30 text-center py-4">Loading...</p>
+              ) : qrSessions.length === 0 ? (
+                <p className="text-white/40 text-center py-4">No QR codes yet. Create some above!</p>
+              ) : (
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {qrSessions.map((s) => (
+                    <div key={s.id} className={`rounded-xl p-4 transition-colors ${s.claimed_by ? "bg-green-500/10 border border-green-500/20" : "bg-white/5 border border-white/5"}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-white font-medium truncate">{s.name}</p>
+                            {!s.is_active && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Inactive</span>}
+                          </div>
+                          <p className="text-banditos-gold font-mono text-xs mt-0.5">{s.code}</p>
+                          {s.claimed_name && (
+                            <p className="text-green-400/80 text-xs mt-1">Claimed by {s.claimed_name}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            onClick={() => window.open(`/qr/${s.code}`, "_blank")}
+                            className="text-xs bg-white/10 text-white/60 px-3 py-1.5 rounded-lg hover:bg-white/20"
+                            title="View/print QR"
+                          >
+                            QR
+                          </button>
+                          {s.claimed_by && (
+                            <button
+                              onClick={() => handleQrAction("reset-one", s.id)}
+                              disabled={saving}
+                              className="text-xs bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded-lg hover:bg-orange-500/30"
+                            >
+                              Reset
+                            </button>
+                          )}
+                          <button
+                            onClick={() => { if (confirm(`Delete QR code "${s.name}"?`)) handleQrAction("delete", s.id); }}
+                            disabled={saving}
+                            className="text-xs bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/30"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

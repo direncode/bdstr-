@@ -142,6 +142,22 @@ insert into questions (round_id, question, answer, sort_order) values
   ('44444444-4444-4444-4444-444444444444', 'Which UNC alum is considered the basketball GOAT?', 'Michael Jordan', 6),
   ('44444444-4444-4444-4444-444444444444', 'What is the traditional UNC cheer?', 'Go Heels!', 7);
 
+-- 7. QR SESSIONS (physical presence gating)
+create table if not exists qr_sessions (
+  id uuid default gen_random_uuid() primary key,
+  code text not null unique,
+  name text not null,
+  claimed_by uuid references profiles(id) on delete set null,
+  claimed_at timestamptz,
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_qr_sessions_code on qr_sessions(code);
+
+alter table qr_sessions enable row level security;
+create policy "Allow all on qr_sessions" on qr_sessions for all using (true) with check (true);
+
 -- ============================================================
 -- To make yourself admin: go to Table Editor → profiles →
 -- set is_admin to true for your row
