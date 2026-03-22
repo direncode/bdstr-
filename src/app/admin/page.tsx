@@ -353,7 +353,7 @@ function AdminContent() {
   const currentRoundQuestions = rounds.find((r) => r.id === selectedRoundId)?.questions || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24 safe-bottom">
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white">← Back</button>
         <BanditosLogo size="sm" />

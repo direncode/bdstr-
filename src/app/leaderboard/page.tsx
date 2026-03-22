@@ -40,7 +40,7 @@ export default function LeaderboardPage() {
   const rest = players.slice(3);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] pb-20">
+    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] pb-20 safe-bottom">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white" aria-label="Go back to home">
