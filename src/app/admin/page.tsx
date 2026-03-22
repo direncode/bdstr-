@@ -14,8 +14,8 @@ interface Round {
   questions: Question[];
 }
 
-type TabType = "game" | "rounds" | "questions" | "attendance" | "qrcodes" | "trivianight";
-const VALID_TABS: TabType[] = ["game", "rounds", "questions", "attendance", "qrcodes", "trivianight"];
+type TabType = "game" | "rounds" | "questions" | "triviaadmin" | "qrcodes";
+const VALID_TABS: TabType[] = ["game", "rounds", "questions", "triviaadmin", "qrcodes"];
 
 export default function AdminPage() {
   return (
@@ -42,23 +42,17 @@ function AdminContent() {
   const [busyness, setBusyness] = useState<{ percent: number; questionsAllowed: number; label: string; source: string } | null>(null);
   const [busyOverride, setBusyOverride] = useState("");
 
-  // Attendance
-  const [attendSearch, setAttendSearch] = useState("");
-  const [attendPlayers, setAttendPlayers] = useState<{ id: string; display_name: string; total_points: number; games_played: number }[]>([]);
-  const [attendLogs, setAttendLogs] = useState<{ id: string; player_name: string; points_added: number; note: string; created_at: string }[]>([]);
-  const [attendLoading, setAttendLoading] = useState(false);
-  const [doubleResult, setDoubleResult] = useState<{ playerName: string; pointsAdded: number; newTotal: number } | null>(null);
-
   // QR Sessions
   const [qrSessions, setQrSessions] = useState<{ id: string; code: string; name: string; claimed_by: string | null; claimed_name: string | null; claimed_at: string | null; is_active: boolean }[]>([]);
   const [newQrName, setNewQrName] = useState("");
   const [newQrCount, setNewQrCount] = useState("1");
   const [qrLoading, setQrLoading] = useState(false);
 
-  // Trivia Night
+  // Trivia Night Admin
   const [tnNight, setTnNight] = useState<{ id: string; week_label: string; is_active: boolean; is_closed: boolean } | null>(null);
-  const [tnCheckins, setTnCheckins] = useState<{ id: string; player_id: string; player_name: string; has_qr_bonus: boolean; points_awarded: number }[]>([]);
-  const [tnPointInputs, setTnPointInputs] = useState<Record<string, string>>({});
+  const [tnCheckins, setTnCheckins] = useState<{ id: string; player_id: string; player_name: string; has_qr_bonus: boolean; points_awarded: number; round_scores: { round_number: number; round_label: string; score: number }[] }[]>([]);
+  const [tnRoundInputs, setTnRoundInputs] = useState<Record<string, Record<number, string>>>({});
+  const [tnNumRounds, setTnNumRounds] = useState(4);
   const [tnLoading, setTnLoading] = useState(false);
 
   // Round form
@@ -218,45 +212,6 @@ function AdminContent() {
     await doAction("delete-question", { questionId });
   };
 
-  // Attendance handlers
-  const searchPlayers = async (q: string) => {
-    setAttendSearch(q);
-    if (!q.trim()) { setAttendPlayers([]); return; }
-    setAttendLoading(true);
-    try {
-      const res = await fetch(`/api/attendance?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      setAttendPlayers(data.players || []);
-      setAttendLogs(data.logs || []);
-    } finally { setAttendLoading(false); }
-  };
-
-  const loadAttendanceLogs = async () => {
-    const res = await fetch("/api/attendance?q=");
-    const data = await res.json();
-    setAttendLogs(data.logs || []);
-  };
-
-  const addDoublePoints = async (playerId: string, basePoints: number = 10) => {
-    if (!confirm(`Add ${basePoints * 2} double points to this player?`)) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId, basePoints }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setDoubleResult(data);
-        setTimeout(() => setDoubleResult(null), 3000);
-        // Refresh search results
-        if (attendSearch.trim()) searchPlayers(attendSearch);
-        loadAttendanceLogs();
-      }
-    } finally { setSaving(false); }
-  };
-
   const loadQrSessions = async () => {
     setQrLoading(true);
     try {
@@ -315,19 +270,37 @@ function AdminContent() {
     } finally { setSaving(false); }
   };
 
-  const awardTriviaNightPoints = async (checkinId: string) => {
-    const raw = tnPointInputs[checkinId];
-    const points = parseInt(raw);
-    if (isNaN(points) || points < 0) return;
+  const awardRoundScore = async (checkinId: string, roundNumber: number) => {
+    const raw = tnRoundInputs[checkinId]?.[roundNumber];
+    const score = parseInt(raw);
+    if (isNaN(score) || score < 0) return;
     setSaving(true);
     try {
       await fetch("/api/trivia-night", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "award-points", checkinId, points }),
+        body: JSON.stringify({ action: "award-round-score", checkinId, roundNumber, roundLabel: `Round ${roundNumber}`, score }),
       });
       await loadTriviaNight();
-      setTnPointInputs((prev) => ({ ...prev, [checkinId]: "" }));
+    } finally { setSaving(false); }
+  };
+
+  const awardAllRoundsForPlayer = async (checkinId: string) => {
+    const inputs = tnRoundInputs[checkinId] || {};
+    setSaving(true);
+    try {
+      for (let r = 1; r <= tnNumRounds; r++) {
+        const raw = inputs[r];
+        const score = parseInt(raw);
+        if (!isNaN(score) && score >= 0) {
+          await fetch("/api/trivia-night", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "award-round-score", checkinId, roundNumber: r, roundLabel: `Round ${r}`, score }),
+          });
+        }
+      }
+      await loadTriviaNight();
     } finally { setSaving(false); }
   };
 
@@ -390,13 +363,13 @@ function AdminContent() {
 
       {/* Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
-        {(["game", "rounds", "questions", "attendance", "qrcodes", "trivianight"] as const).map((t) => (
+        {(["game", "rounds", "questions", "triviaadmin", "qrcodes"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => { setTab(t); if (t === "attendance") loadAttendanceLogs(); if (t === "qrcodes") loadQrSessions(); if (t === "trivianight") loadTriviaNight(); }}
+            onClick={() => { setTab(t); if (t === "qrcodes") loadQrSessions(); if (t === "triviaadmin") loadTriviaNight(); }}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${tab === t ? "bg-banditos-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
           >
-            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "attendance" ? "Attendance" : t === "qrcodes" ? "QR Codes" : "Trivia Night"}
+            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "triviaadmin" ? "Trivia Night" : "QR Codes"}
           </button>
         ))}
       </div>
@@ -722,83 +695,6 @@ function AdminContent() {
           </>
         )}
 
-        {/* ==================== ATTENDANCE TAB ==================== */}
-        {tab === "attendance" && (
-          <>
-            {/* Double points success banner */}
-            {doubleResult && (
-              <div className="bg-green-500/20 border border-green-500/40 rounded-2xl p-4 text-center animate-slide-up">
-                <p className="text-green-300 font-bold text-lg">+{doubleResult.pointsAdded} points added!</p>
-                <p className="text-green-300/60 text-sm">{doubleResult.playerName} now has {doubleResult.newTotal} total</p>
-              </div>
-            )}
-
-            {/* Player Search */}
-            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
-              <h2 className="text-white font-bold text-lg mb-2">Add Double Points</h2>
-              <p className="text-white/40 text-sm mb-4">Search for a player from the paper sign-in sheet, then award 2x points for attendance.</p>
-
-              <input
-                type="text"
-                placeholder="Search player by name..."
-                value={attendSearch}
-                onChange={(e) => searchPlayers(e.target.value)}
-                autoFocus
-                className="w-full bg-white/10 text-white rounded-xl px-4 py-3 placeholder-white/30 outline-none focus:ring-2 focus:ring-banditos-gold text-lg"
-              />
-
-              {attendLoading && <p className="text-white/30 text-sm mt-3">Searching...</p>}
-
-              {attendPlayers.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {attendPlayers.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors">
-                      <div>
-                        <p className="text-white font-medium">{p.display_name}</p>
-                        <p className="text-white/40 text-xs">{p.total_points} pts &middot; {p.games_played} games</p>
-                      </div>
-                      <button
-                        onClick={() => addDoublePoints(p.id)}
-                        disabled={saving}
-                        className="bg-banditos-gold text-banditos-dark px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40"
-                      >
-                        +20 Double
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {attendSearch.trim() && !attendLoading && attendPlayers.length === 0 && (
-                <p className="text-white/30 text-sm mt-3">No players found for &quot;{attendSearch}&quot;</p>
-              )}
-            </div>
-
-            {/* Recent Attendance Log */}
-            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
-              <h2 className="text-white font-bold text-lg mb-4">Recent Attendance Log</h2>
-              {attendLogs.length === 0 ? (
-                <p className="text-white/40 text-center py-4">No attendance entries yet.</p>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {attendLogs.map((log) => (
-                    <div key={log.id} className="flex items-center justify-between bg-white/5 rounded-xl p-3">
-                      <div>
-                        <p className="text-white font-medium text-sm">{log.player_name}</p>
-                        <p className="text-white/30 text-xs">{log.note}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-green-400 font-bold text-sm">+{log.points_added}</p>
-                        <p className="text-white/20 text-xs">{new Date(log.created_at).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
         {/* ==================== QR CODES TAB ==================== */}
         {tab === "qrcodes" && (
           <>
@@ -912,15 +808,15 @@ function AdminContent() {
           </>
         )}
 
-        {/* ==================== TRIVIA NIGHT TAB ==================== */}
-        {tab === "trivianight" && (
+        {/* ==================== TRIVIA NIGHT ADMIN TAB ==================== */}
+        {tab === "triviaadmin" && (
           <>
             {/* Open / Status */}
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-white font-bold text-lg">Trivia Night</h2>
-                  <p className="text-white/40 text-sm">Paper trivia at Bandidos — Tuesday 7-9 PM</p>
+                  <h2 className="text-white font-bold text-lg">Trivia Night Admin</h2>
+                  <p className="text-white/40 text-sm">Score players who checked in via QR code</p>
                 </div>
                 {!tnNight || tnNight.is_closed ? (
                   <button
@@ -942,8 +838,8 @@ function AdminContent() {
                 <div className="bg-white/5 rounded-xl p-4">
                   <p className="text-white font-medium">{tnNight.week_label}</p>
                   <p className="text-white/40 text-xs mt-1">
-                    {tnCheckins.length} player{tnCheckins.length !== 1 ? "s" : ""} checked in
-                    &middot; {tnCheckins.filter(c => c.has_qr_bonus).length} with QR bonus (3x)
+                    {tnCheckins.length} player{tnCheckins.length !== 1 ? "s" : ""} checked in via QR
+                    &middot; {tnCheckins.filter(c => c.has_qr_bonus).length} with 3x bonus
                   </p>
                 </div>
               )}
@@ -956,69 +852,133 @@ function AdminContent() {
               )}
 
               {!tnNight && !tnLoading && (
-                <p className="text-white/40 text-sm">No active night. Hit &quot;Open Night&quot; to start one for tonight.</p>
+                <p className="text-white/40 text-sm">No active night. Hit &quot;Open Night&quot; to start one.</p>
               )}
 
               {tnLoading && <p className="text-white/30 text-sm">Loading...</p>}
             </div>
 
-            {/* Award Points */}
+            {/* Round Configuration */}
             {tnNight && !tnNight.is_closed && (
               <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
-                <h2 className="text-white font-bold text-lg mb-2">Award Points</h2>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-white font-bold text-lg">Rounds</h2>
+                  <div className="flex items-center gap-2">
+                    <label className="text-white/40 text-sm">Number of rounds:</label>
+                    <select
+                      value={tnNumRounds}
+                      onChange={(e) => setTnNumRounds(parseInt(e.target.value))}
+                      className="bg-white/10 text-white rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-banditos-gold"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                        <option key={n} value={n} className="bg-gray-800">{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-white/30 text-xs">Set the number of rounds for tonight, then enter scores per round for each checked-in player below.</p>
+              </div>
+            )}
+
+            {/* Per-Player Round Scoring */}
+            {tnNight && !tnNight.is_closed && (
+              <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+                <h2 className="text-white font-bold text-lg mb-2">Score Players</h2>
                 <p className="text-white/40 text-sm mb-4">
-                  Enter base points from paper trivia. Players with QR scan get <span className="text-green-400 font-bold">3x</span>, others get <span className="text-white font-bold">1x</span>.
+                  Only players who checked in by scanning a QR code appear here.
+                  {tnCheckins.some(c => c.has_qr_bonus) && <> Players with QR bonus get <span className="text-green-400 font-bold">3x</span> on all scores.</>}
                 </p>
 
                 {tnCheckins.length === 0 ? (
-                  <p className="text-white/30 text-center py-6">No players checked in yet. Players check in via the app during Tuesday 7-9 PM.</p>
+                  <div className="text-center py-8">
+                    <p className="text-white/30">No players checked in yet.</p>
+                    <p className="text-white/20 text-xs mt-2">Players check in by scanning a QR code at the venue.</p>
+                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {tnCheckins.map((c) => (
-                      <div key={c.id} className={`rounded-xl p-4 ${c.has_qr_bonus ? "bg-green-500/10 border border-green-500/20" : "bg-white/5 border border-white/5"}`}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
+                  <div className="space-y-4">
+                    {tnCheckins.map((c) => {
+                      const existingScores: Record<number, number> = {};
+                      for (const rs of c.round_scores) {
+                        existingScores[rs.round_number] = rs.score;
+                      }
+                      const playerInputs = tnRoundInputs[c.id] || {};
+                      const totalBase = Array.from({ length: tnNumRounds }, (_, i) => {
+                        const input = playerInputs[i + 1];
+                        return input !== undefined ? (parseInt(input) || 0) : (existingScores[i + 1] || 0);
+                      }).reduce((sum, v) => sum + v, 0);
+                      const multiplier = c.has_qr_bonus ? 3 : 1;
+
+                      return (
+                        <div key={c.id} className={`rounded-2xl p-4 ${c.has_qr_bonus ? "bg-green-500/10 border border-green-500/20" : "bg-white/5 border border-white/10"}`}>
+                          {/* Player header */}
+                          <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <p className="text-white font-medium truncate">{c.player_name}</p>
-                              {c.has_qr_bonus && (
-                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold shrink-0">3x</span>
-                              )}
-                              {!c.has_qr_bonus && (
-                                <span className="text-xs bg-white/10 text-white/40 px-2 py-0.5 rounded-full shrink-0">1x</span>
+                              <p className="text-white font-bold">{c.player_name}</p>
+                              {c.has_qr_bonus ? (
+                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold">3x QR</span>
+                              ) : (
+                                <span className="text-xs bg-white/10 text-white/40 px-2 py-0.5 rounded-full">1x</span>
                               )}
                             </div>
-                            {c.points_awarded > 0 && (
-                              <p className="text-banditos-gold text-xs mt-0.5">
-                                Awarded: {c.points_awarded} pts
-                                {c.has_qr_bonus && <span className="text-green-400"> (includes 3x)</span>}
+                            <div className="text-right">
+                              <p className="text-banditos-gold font-bold text-sm">
+                                {totalBase} base × {multiplier} = {totalBase * multiplier} pts
                               </p>
-                            )}
+                              {c.points_awarded > 0 && (
+                                <p className="text-white/30 text-xs">Saved: {c.points_awarded} pts</p>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="Pts"
-                              value={tnPointInputs[c.id] || ""}
-                              onChange={(e) => setTnPointInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                              className="w-20 bg-white/10 text-white rounded-lg px-3 py-2 text-sm placeholder-white/30 outline-none focus:ring-2 focus:ring-banditos-gold text-center"
-                            />
-                            <button
-                              onClick={() => awardTriviaNightPoints(c.id)}
-                              disabled={saving || !tnPointInputs[c.id]}
-                              className="bg-banditos-gold text-banditos-dark px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-40"
-                            >
-                              Award
-                            </button>
+
+                          {/* Round score inputs */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                            {Array.from({ length: tnNumRounds }, (_, i) => {
+                              const rn = i + 1;
+                              const saved = existingScores[rn];
+                              const inputVal = playerInputs[rn];
+                              return (
+                                <div key={rn} className="flex flex-col">
+                                  <label className="text-white/40 text-xs mb-1">R{rn}</label>
+                                  <div className="flex gap-1">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder={saved !== undefined ? String(saved) : "0"}
+                                      value={inputVal ?? (saved !== undefined ? String(saved) : "")}
+                                      onChange={(e) => setTnRoundInputs((prev) => ({
+                                        ...prev,
+                                        [c.id]: { ...(prev[c.id] || {}), [rn]: e.target.value },
+                                      }))}
+                                      className="w-full bg-white/10 text-white rounded-lg px-2 py-1.5 text-sm placeholder-white/20 outline-none focus:ring-2 focus:ring-banditos-gold text-center"
+                                    />
+                                    <button
+                                      onClick={() => awardRoundScore(c.id, rn)}
+                                      disabled={saving || (inputVal === undefined && saved === undefined) || (inputVal !== undefined && inputVal === "")}
+                                      className="bg-banditos-gold/80 text-banditos-dark px-2 py-1.5 rounded-lg font-bold text-xs disabled:opacity-30 hover:bg-banditos-gold transition-colors shrink-0"
+                                      title={`Save Round ${rn}`}
+                                    >
+                                      &#10003;
+                                    </button>
+                                  </div>
+                                  {saved !== undefined && (
+                                    <p className="text-green-400/60 text-[10px] mt-0.5 text-center">{saved} saved</p>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
+
+                          {/* Save all rounds button */}
+                          <button
+                            onClick={() => awardAllRoundsForPlayer(c.id)}
+                            disabled={saving}
+                            className="w-full bg-banditos-gold text-banditos-dark py-2 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40"
+                          >
+                            Save All Rounds for {c.player_name}
+                          </button>
                         </div>
-                        {tnPointInputs[c.id] && parseInt(tnPointInputs[c.id]) > 0 && (
-                          <p className="text-white/30 text-xs mt-2">
-                            Preview: {tnPointInputs[c.id]} base × {c.has_qr_bonus ? "3" : "1"} = <span className="text-banditos-gold font-bold">{parseInt(tnPointInputs[c.id]) * (c.has_qr_bonus ? 3 : 1)} pts</span>
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

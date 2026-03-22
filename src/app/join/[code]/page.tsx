@@ -20,6 +20,8 @@ export default function JoinPage() {
   const [profile, setProfile] = useState<{ id: string; display_name: string } | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
+  const [checkedIn, setCheckedIn] = useState(false);
+  const [checkInFailed, setCheckInFailed] = useState(false);
 
   // Auth state
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
@@ -66,7 +68,7 @@ export default function JoinPage() {
     setAuthLoading(false);
   };
 
-  const claimAndPlay = async () => {
+  const claimAndCheckIn = async () => {
     setClaiming(true);
     try {
       const res = await fetch("/api/qr-sessions", {
@@ -78,9 +80,27 @@ export default function JoinPage() {
       if (data.error) {
         setError(data.error);
       } else {
+        // Set QR cookie
         document.cookie = `banditos_qr=${code}; path=/; max-age=${60 * 60 * 12}; samesite=lax`;
         setClaimed(true);
-        setTimeout(() => router.push("/play"), 1500);
+
+        // Auto check-in for trivia night
+        try {
+          const checkinRes = await fetch("/api/trivia-night", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "checkin" }),
+          });
+          const checkinData = await checkinRes.json();
+          if (checkinData.ok) {
+            setCheckedIn(true);
+          } else {
+            // No active trivia night — that's fine, they still get 2x points
+            setCheckInFailed(true);
+          }
+        } catch {
+          setCheckInFailed(true);
+        }
       }
     } catch { setError("Network error"); }
     setClaiming(false);
@@ -89,11 +109,19 @@ export default function JoinPage() {
   // Auto-claim when logged in and session is available
   useEffect(() => {
     if (profile && qrSession && !qrSession.claimed && !claiming && !claimed) {
-      claimAndPlay();
+      claimAndCheckIn();
     } else if (profile && qrSession?.claimed && qrSession.claimedBy === profile.id) {
       document.cookie = `banditos_qr=${code}; path=/; max-age=${60 * 60 * 12}; samesite=lax`;
       setClaimed(true);
-      setTimeout(() => router.push("/play"), 1000);
+      // Also try to check in
+      fetch("/api/trivia-night", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "checkin" }),
+      }).then(r => r.json()).then(data => {
+        if (data.ok) setCheckedIn(true);
+        else setCheckInFailed(true);
+      }).catch(() => setCheckInFailed(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, qrSession]);
@@ -106,15 +134,54 @@ export default function JoinPage() {
     );
   }
 
-  // Successfully claimed
-  if (claimed) {
+  // Successfully claimed + checked in for trivia night
+  if (claimed && checkedIn) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+        <BanditosLogo size="md" />
+        <div className="mt-8 bg-green-500/20 border border-green-500/40 rounded-2xl p-8 text-center max-w-sm w-full" role="status">
+          <h2 className="text-green-300 text-3xl font-bold">You&apos;re Checked In!</h2>
+          <p className="text-green-300/80 mt-3 text-lg">Welcome to Trivia Night at Bandidos</p>
+          <div className="mt-4 bg-green-500/10 rounded-xl p-4">
+            <p className="text-green-300 font-bold text-sm">3x POINTS ACTIVATED</p>
+            <p className="text-green-300/60 text-xs mt-1">Your QR scan gives you triple points on all rounds tonight</p>
+          </div>
+          <p className="text-white/50 text-sm mt-4">The host will score each round — sit tight and have fun!</p>
+        </div>
+        <button onClick={() => router.push("/")}
+          className="mt-6 bg-banditos-red text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
+          Go to Home
+        </button>
+      </main>
+    );
+  }
+
+  // Claimed QR but no active trivia night (gets 2x for regular play)
+  if (claimed && checkInFailed) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="md" />
         <div className="mt-8 bg-green-500/20 border border-green-500/40 rounded-2xl p-8 text-center max-w-sm w-full" role="status">
           <h2 className="text-green-300 text-2xl font-bold">2x Points Activated!</h2>
           <p className="text-green-300/70 mt-2">You&apos;re at Bandidos — all points are doubled for this session.</p>
-          <p className="text-white/40 text-sm mt-4">Taking you to trivia...</p>
+          <p className="text-white/40 text-sm mt-4">No Trivia Night is active right now, but you can still play trivia with double points!</p>
+        </div>
+        <button onClick={() => router.push("/play")}
+          className="mt-6 bg-banditos-red text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
+          Play Trivia
+        </button>
+      </main>
+    );
+  }
+
+  // Claiming in progress
+  if (claimed) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+        <BanditosLogo size="md" />
+        <div className="mt-8 bg-white/10 backdrop-blur rounded-2xl p-8 text-center max-w-sm w-full" role="status">
+          <h2 className="text-white text-xl font-bold">Checking you in...</h2>
+          <p className="text-white/60 mt-2">{qrSession?.name}</p>
         </div>
       </main>
     );
@@ -128,9 +195,9 @@ export default function JoinPage() {
         <div className="mt-8 bg-red-500/20 border border-red-500/40 rounded-2xl p-8 text-center max-w-sm w-full" role="alert">
           <h2 className="text-white text-xl font-bold">Invalid QR Code</h2>
           <p className="text-white/60 mt-2">{error}</p>
-          <p className="text-white/40 text-sm mt-4">Ask the host for a valid QR code for double points.</p>
+          <p className="text-white/40 text-sm mt-4">Ask the host for a valid QR code.</p>
         </div>
-        <button onClick={() => router.push("/play")} className="mt-6 text-banditos-gold text-sm hover:underline">Play without bonus &rarr;</button>
+        <button onClick={() => router.push("/")} className="mt-6 text-banditos-gold text-sm hover:underline">Go to Home &rarr;</button>
       </main>
     );
   }
@@ -145,7 +212,7 @@ export default function JoinPage() {
           <p className="text-white/60 mt-2">This QR code ({qrSession.name}) has already been claimed by another player.</p>
           <p className="text-white/40 text-sm mt-4">Ask the host for a different QR code.</p>
         </div>
-        <button onClick={() => router.push("/play")} className="mt-6 text-banditos-gold text-sm hover:underline">Play without bonus &rarr;</button>
+        <button onClick={() => router.push("/")} className="mt-6 text-banditos-gold text-sm hover:underline">Go to Home &rarr;</button>
       </main>
     );
   }
@@ -159,7 +226,7 @@ export default function JoinPage() {
           <h2 className="text-white text-xl font-bold">Error</h2>
           <p className="text-white/60 mt-2">{error}</p>
         </div>
-        <button onClick={() => router.push("/play")} className="mt-6 text-banditos-gold text-sm hover:underline">Play without bonus &rarr;</button>
+        <button onClick={() => router.push("/")} className="mt-6 text-banditos-gold text-sm hover:underline">Go to Home &rarr;</button>
       </main>
     );
   }
@@ -172,7 +239,7 @@ export default function JoinPage() {
 
         <div className="mt-4 bg-green-500/20 border border-green-500/40 rounded-2xl p-4 text-center max-w-sm w-full" role="status">
           <p className="text-green-300 font-bold text-sm">You&apos;re at Bandidos! — {qrSession?.name}</p>
-          <p className="text-green-300/60 text-xs">Sign in to activate 2x points.</p>
+          <p className="text-green-300/60 text-xs">Sign in to check in for Trivia Night</p>
         </div>
 
         <div className="mt-4 w-full max-w-sm bg-white/10 backdrop-blur rounded-2xl p-6">
@@ -204,12 +271,12 @@ export default function JoinPage() {
             </div>
             <button type="submit" disabled={authLoading || !displayName.trim()}
               className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50">
-              {authLoading ? "Loading..." : authMode === "register" ? "JOIN & GET 2x" : "LOG IN & GET 2x"}
+              {authLoading ? "Loading..." : authMode === "register" ? "JOIN & CHECK IN" : "LOG IN & CHECK IN"}
             </button>
           </form>
         </div>
 
-        <button onClick={() => router.push("/play")} className="mt-6 text-white/40 text-sm hover:text-white/60">Play without bonus &rarr;</button>
+        <button onClick={() => router.push("/")} className="mt-6 text-white/40 text-sm hover:text-white/60">Go to Home &rarr;</button>
       </main>
     );
   }
@@ -219,7 +286,7 @@ export default function JoinPage() {
     <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
       <BanditosLogo size="md" />
       <div className="mt-8 bg-white/10 backdrop-blur rounded-2xl p-8 text-center max-w-sm w-full" role="status">
-        <h2 className="text-white text-xl font-bold">{claiming ? "Activating 2x points..." : "Ready!"}</h2>
+        <h2 className="text-white text-xl font-bold">{claiming ? "Scanning your QR code..." : "Ready!"}</h2>
         <p className="text-white/60 mt-2">{qrSession?.name}</p>
       </div>
     </main>

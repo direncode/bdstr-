@@ -280,17 +280,13 @@ export default function HomePage() {
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
                     Manage Rounds
                   </button>
-                  <button onClick={() => router.push("/admin?tab=trivianight")}
+                  <button onClick={() => router.push("/admin?tab=triviaadmin")}
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
                     Trivia Night
                   </button>
                   <button onClick={() => router.push("/admin?tab=qrcodes")}
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
                     QR Codes
-                  </button>
-                  <button onClick={() => router.push("/admin?tab=attendance")}
-                    className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
-                    Attendance
                   </button>
                   <button onClick={() => router.push("/admin?tab=game")}
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
