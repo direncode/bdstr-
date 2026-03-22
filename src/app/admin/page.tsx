@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -14,14 +14,29 @@ interface Round {
   questions: Question[];
 }
 
+type TabType = "game" | "rounds" | "questions" | "attendance" | "qrcodes" | "trivianight";
+const VALID_TABS: TabType[] = ["game", "rounds", "questions", "attendance", "qrcodes", "trivianight"];
+
 export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-banditos-dark flex items-center justify-center"><BanditosLogo size="md" /></div>}>
+      <AdminContent />
+    </Suspense>
+  );
+}
+
+function AdminContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
-  const [tab, setTab] = useState<"game" | "rounds" | "questions" | "attendance" | "qrcodes" | "trivianight">("game");
+
+  const tabParam = searchParams.get("tab") as TabType | null;
+  const initialTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : "game";
+  const [tab, setTab] = useState<TabType>(initialTab);
 
   // Busyness
   const [busyness, setBusyness] = useState<{ percent: number; questionsAllowed: number; label: string; source: string } | null>(null);
