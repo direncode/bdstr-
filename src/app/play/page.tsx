@@ -13,16 +13,17 @@ interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: stri
 interface GameComplete {
   correctCount: number; totalQuestions: number; totalPoints: number;
   bonusPoints: number; maxStreak: number; perfectRound: boolean;
+  doublePoints: boolean; doublePointsAdded: number;
 }
 
-type Screen = "auth" | "scan-required" | "gate" | "playing" | "result" | "complete";
+type Screen = "auth" | "gate" | "playing" | "result" | "complete";
 
 export default function PlayPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<Screen>("auth");
   const [loading, setLoading] = useState(true);
-  const [qrVerified, setQrVerified] = useState(false);
+  const [hasQrBonus, setHasQrBonus] = useState(false);
 
   // Auth
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
@@ -44,30 +45,15 @@ export default function PlayPage() {
   const [streak, setStreak] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Check if already logged in and has valid QR session
+  // Check if already logged in
   useEffect(() => {
+    // Check for QR bonus cookie
     const qrCode = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
+    if (qrCode) setHasQrBonus(true);
 
     fetch("/api/auth")
       .then((r) => r.json())
-      .then(async (d) => {
-        if (d.profile) {
-          setProfile(d.profile);
-          // Verify QR session
-          if (qrCode) {
-            const qrRes = await fetch(`/api/qr-sessions?code=${qrCode}`);
-            const qrData = await qrRes.json();
-            if (!qrData.error && qrData.claimedBy === d.profile.id) {
-              setQrVerified(true);
-              setScreen("gate");
-            } else {
-              setScreen("scan-required");
-            }
-          } else {
-            setScreen("scan-required");
-          }
-        }
-      })
+      .then((d) => { if (d.profile) { setProfile(d.profile); setScreen("gate"); } })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -122,20 +108,7 @@ export default function PlayPage() {
 
       if (data.profile) {
         setProfile(data.profile);
-        // Check QR session after auth
-        const qrCode = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
-        if (qrCode) {
-          const qrRes = await fetch(`/api/qr-sessions?code=${qrCode}`);
-          const qrData = await qrRes.json();
-          if (!qrData.error && qrData.claimedBy === data.profile.id) {
-            setQrVerified(true);
-            setScreen("gate");
-          } else {
-            setScreen("scan-required");
-          }
-        } else {
-          setScreen("scan-required");
-        }
+        setScreen("gate");
       } else {
         setAuthError("Account created but profile not ready. Please try logging in.");
       }
@@ -189,7 +162,14 @@ export default function PlayPage() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="md" />
-        <div className="mt-8 w-full max-w-sm bg-white/10 backdrop-blur rounded-2xl p-6">
+
+        {hasQrBonus && (
+          <div className="mt-4 bg-green-500/20 border border-green-500/40 rounded-2xl p-3 text-center max-w-sm w-full animate-slide-up">
+            <p className="text-green-300 font-bold text-sm">📍 QR Scanned — 2x Points Active!</p>
+          </div>
+        )}
+
+        <div className="mt-4 w-full max-w-sm bg-white/10 backdrop-blur rounded-2xl p-6">
           <div className="flex gap-2 mb-6">
             <button onClick={() => setAuthMode("register")} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "register" ? "bg-banditos-red text-white" : "text-white/60"}`}>
               New Player
@@ -215,36 +195,7 @@ export default function PlayPage() {
           </form>
         </div>
 
-        <button onClick={() => router.push("/")} className="mt-6 text-white/40 text-sm hover:text-white/60">← Back</button>
-      </div>
-    );
-  }
-
-  // ============ SCAN REQUIRED ============
-  if (screen === "scan-required") {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
-        <BanditosLogo size="lg" />
-        <div className="mt-8 w-full max-w-sm">
-          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
-            <span className="text-6xl">📱</span>
-            <h2 className="text-white text-xl font-bold mt-4">Scan a QR Code to Play</h2>
-            <p className="text-white/60 mt-2">
-              Find a QR code at Bandidos and scan it with your phone camera to join tonight&apos;s trivia!
-            </p>
-            <div className="mt-6 bg-white/5 rounded-xl p-4 border border-white/10">
-              <p className="text-banditos-gold text-sm font-medium">Look for QR codes on:</p>
-              <p className="text-white/40 text-xs mt-1">Tables, the bar counter, or at the entrance</p>
-            </div>
-          </div>
-        </div>
-        <div className="mt-6 flex gap-3 items-center">
-          <span className="text-white/50 text-sm">{profile?.display_name}</span>
-          <span className="text-white/20">|</span>
-          <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Leaderboard</button>
-          <span className="text-white/20">|</span>
-          <button onClick={handleSignOut} className="text-white/40 text-sm hover:text-white/60">Logout</button>
-        </div>
+        <button onClick={() => router.push("/")} className="mt-6 text-white/40 text-sm hover:text-white/60">&larr; Back</button>
       </div>
     );
   }
@@ -255,7 +206,13 @@ export default function PlayPage() {
       <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="lg" />
 
-        <div className="mt-6 w-full max-w-sm">
+        {hasQrBonus && (
+          <div className="mt-4 bg-green-500/20 border border-green-500/40 rounded-xl px-4 py-2 text-center animate-pulse">
+            <p className="text-green-300 font-bold text-sm">📍 2x POINTS — In-Store Bonus Active</p>
+          </div>
+        )}
+
+        <div className="mt-4 w-full max-w-sm">
           {!unlocked ? (
             <div className="text-center animate-slide-up">
               <div className="bg-white/10 backdrop-blur rounded-2xl p-8">
@@ -340,13 +297,16 @@ export default function PlayPage() {
           <div className="text-right">
             <p className="text-banditos-gold font-bold">{currentIdx + 1}/{questions.length}</p>
             {streak > 0 && <p className="text-orange-400 text-xs">{streak} streak 🔥</p>}
+            {hasQrBonus && <p className="text-green-400 text-xs font-bold">2x PTS</p>}
           </div>
         </div>
 
         <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full">
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6 mb-6">
             <p className="text-white text-xl font-bold leading-relaxed">{q.text}</p>
-            <p className="text-banditos-gold/60 text-sm mt-2">{q.points} points</p>
+            <p className="text-banditos-gold/60 text-sm mt-2">
+              {q.points} points{hasQrBonus && <span className="text-green-400 ml-1">(2x → {q.points * 2})</span>}
+            </p>
           </div>
 
           {screen === "playing" ? (
@@ -411,6 +371,12 @@ export default function PlayPage() {
             <div className="flex justify-between text-white"><span className="text-white/60">Correct</span><span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span></div>
             <div className="flex justify-between text-white"><span className="text-white/60">Points</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
             {gameResult.bonusPoints > 0 && <div className="flex justify-between text-white"><span className="text-white/60">Bonus</span><span className="font-bold text-green-400">+{gameResult.bonusPoints}</span></div>}
+            {gameResult.doublePoints && (
+              <div className="flex justify-between text-white">
+                <span className="text-white/60">📍 In-Store 2x</span>
+                <span className="font-bold text-green-400">+{gameResult.doublePointsAdded}</span>
+              </div>
+            )}
             <div className="flex justify-between text-white"><span className="text-white/60">Best Streak</span><span className="font-bold">{gameResult.maxStreak} 🔥</span></div>
             <div className="pt-2">
               <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">

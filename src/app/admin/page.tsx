@@ -731,7 +731,7 @@ export default function AdminPage() {
             {/* Create QR Codes */}
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
               <h2 className="text-white font-bold text-lg mb-2">Create QR Codes</h2>
-              <p className="text-white/40 text-sm mb-4">Generate named QR codes for tables, bar, entrance, etc. Players must scan to play.</p>
+              <p className="text-white/40 text-sm mb-4">Generate named QR codes for tables, bar, entrance, etc. Players who scan get 2x points for being in-store!</p>
               <div className="space-y-3">
                 <input
                   type="text" placeholder="Name (e.g. Table 1, Bar, Front Door)"

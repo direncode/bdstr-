@@ -29,11 +29,10 @@ export default function SplashPage() {
         {profile ? (
           <>
             <p className="text-center text-white/70 text-sm mb-1">Welcome back, {profile.display_name}!</p>
-            <div className="w-full bg-white/10 backdrop-blur rounded-2xl p-5 text-center border border-white/20">
-              <span className="text-3xl">📱</span>
-              <p className="text-white font-bold mt-2">Scan a QR Code to Play</p>
-              <p className="text-white/50 text-xs mt-1">Find a QR code at Bandidos to join trivia</p>
-            </div>
+            <button onClick={() => router.push("/play")}
+              className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors">
+              PLAY TRIVIA
+            </button>
             <button onClick={() => router.push("/leaderboard")}
               className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-2xl font-bold border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors">
               LEADERBOARD
@@ -51,11 +50,10 @@ export default function SplashPage() {
           </>
         ) : (
           <>
-            <div className="w-full bg-white/10 backdrop-blur rounded-2xl p-5 text-center border border-white/20">
-              <span className="text-3xl">📱</span>
-              <p className="text-white font-bold mt-2">Scan a QR Code to Play</p>
-              <p className="text-white/50 text-xs mt-1">Find a QR code at Bandidos to start</p>
-            </div>
+            <button onClick={() => router.push("/play")}
+              className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl animate-pulse-glow hover:bg-red-700 transition-colors">
+              ENTER
+            </button>
             <button onClick={() => router.push("/leaderboard")}
               className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-2xl font-bold border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors">
               LEADERBOARD

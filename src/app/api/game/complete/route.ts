@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSession } from "@/lib/session";
 import { getGameState } from "@/lib/game-cache";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +43,35 @@ export async function POST() {
   if (correctCount === totalQuestions && totalQuestions > 0) bonusPoints = 25;
   if (maxStreak >= 5) bonusPoints += 15;
 
+  // Check for QR double points (in-store bonus)
+  const cookieStore = await cookies();
+  const qrCode = cookieStore.get("banditos_qr")?.value;
+  let doublePoints = false;
+  let doublePointsAdded = 0;
+
+  if (qrCode) {
+    // Verify the QR code is actually claimed by this player
+    const { data: qrSession } = await supabase
+      .from("qr_sessions")
+      .select("id, claimed_by")
+      .eq("code", qrCode.toUpperCase())
+      .eq("claimed_by", profile.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (qrSession) {
+      doublePoints = true;
+      // Double the earned points (question points + bonus)
+      doublePointsAdded = totalPoints + bonusPoints;
+    }
+  }
+
+  const grandTotal = totalPoints + bonusPoints + doublePointsAdded;
+
   await supabase
     .from("profiles")
     .update({
-      total_points: (profile.total_points || 0) + bonusPoints,
+      total_points: (profile.total_points || 0) + bonusPoints + doublePointsAdded,
       games_played: (profile.games_played || 0) + 1,
       best_streak: Math.max(profile.best_streak || 0, maxStreak),
     })
@@ -53,8 +79,10 @@ export async function POST() {
 
   return NextResponse.json({
     correctCount, totalQuestions,
-    totalPoints: totalPoints + bonusPoints,
+    totalPoints: grandTotal,
     bonusPoints, maxStreak,
     perfectRound: correctCount === totalQuestions,
+    doublePoints,
+    doublePointsAdded,
   });
 }
