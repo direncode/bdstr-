@@ -32,7 +32,7 @@ export async function GET() {
       bestStreak: profile.best_streak,
       rank,
       level: level.name,
-      levelEmoji: level.emoji,
+      levelBadge: level.badge,
     },
     profileUrl: `${baseUrl}/profile?id=${profile.id}`,
   });

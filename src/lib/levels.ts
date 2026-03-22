@@ -1,20 +1,20 @@
 export interface Level {
   name: string;
-  emoji: string;
+  badge: string;
   minPoints: number;
   color: string;
   bg: string;
 }
 
 export const LEVELS: Level[] = [
-  { name: "Newbie",   emoji: "🌱", minPoints: 0,    color: "text-gray-500",   bg: "bg-gray-100" },
-  { name: "Regular",  emoji: "🌮", minPoints: 50,   color: "text-green-600",  bg: "bg-green-100" },
-  { name: "Bronze",   emoji: "🥉", minPoints: 150,  color: "text-amber-700",  bg: "bg-amber-100" },
-  { name: "Silver",   emoji: "🥈", minPoints: 300,  color: "text-gray-500",   bg: "bg-gray-200" },
-  { name: "Gold",     emoji: "🥇", minPoints: 500,  color: "text-yellow-600", bg: "bg-yellow-100" },
-  { name: "Platinum", emoji: "💎", minPoints: 1000, color: "text-blue-600",   bg: "bg-blue-100" },
-  { name: "Diamond",  emoji: "👑", minPoints: 2000, color: "text-purple-600", bg: "bg-purple-100" },
-  { name: "Legend",   emoji: "🔥", minPoints: 5000, color: "text-red-600",    bg: "bg-red-100" },
+  { name: "Newbie",   badge: "I",   minPoints: 0,    color: "text-gray-500",   bg: "bg-gray-100" },
+  { name: "Regular",  badge: "II",  minPoints: 50,   color: "text-green-600",  bg: "bg-green-100" },
+  { name: "Bronze",   badge: "III", minPoints: 150,  color: "text-amber-700",  bg: "bg-amber-100" },
+  { name: "Silver",   badge: "IV",  minPoints: 300,  color: "text-gray-500",   bg: "bg-gray-200" },
+  { name: "Gold",     badge: "V",   minPoints: 500,  color: "text-yellow-600", bg: "bg-yellow-100" },
+  { name: "Platinum", badge: "VI",  minPoints: 1000, color: "text-blue-600",   bg: "bg-blue-100" },
+  { name: "Diamond",  badge: "VII", minPoints: 2000, color: "text-purple-600", bg: "bg-purple-100" },
+  { name: "Legend",   badge: "VIII",minPoints: 5000, color: "text-red-600",    bg: "bg-red-100" },
 ];
 
 export function getLevel(points: number): Level {

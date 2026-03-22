@@ -37,7 +37,7 @@ function ProfileContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex items-center justify-center" role="status">
         <BanditosLogo size="md" />
       </div>
     );
@@ -45,11 +45,11 @@ function ProfileContent() {
 
   if (error || !player) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="md" />
-        <p className="text-white/60 mt-6">{error || "Player not found"}</p>
+        <p className="text-white/60 mt-6" role="alert">{error || "Player not found"}</p>
         <button onClick={() => router.push("/")} className="mt-4 text-banditos-gold hover:underline">Go Home</button>
-      </div>
+      </main>
     );
   }
 
@@ -58,13 +58,13 @@ function ProfileContent() {
   const progress = getLevelProgress(player.total_points);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
       <BanditosLogo size="md" />
 
-      <div className="mt-8 w-full max-w-sm animate-slide-up">
+      <div className="mt-8 w-full max-w-sm">
         <div className="bg-white/10 backdrop-blur rounded-2xl p-6 text-center border border-white/10">
           {/* Level badge */}
-          <span className="text-6xl">{level.emoji}</span>
+          <p className={`text-2xl font-bold ${level.color}`}>{level.badge}</p>
           <h1 className="text-white text-2xl font-bold mt-3">{player.display_name}</h1>
           <p className="text-banditos-gold font-medium">{level.name}</p>
 
@@ -84,7 +84,6 @@ function ProfileContent() {
             </div>
           </div>
 
-          {/* Games played */}
           <div className="mt-4 pt-4 border-t border-white/10">
             <p className="text-white/60 text-sm">{player.games_played} rounds played</p>
           </div>
@@ -93,10 +92,10 @@ function ProfileContent() {
           {next && (
             <div className="mt-4">
               <div className="flex justify-between text-xs text-white/40 mb-1">
-                <span>{level.emoji} {level.name}</span>
-                <span>{next.emoji} {next.name}</span>
+                <span>{level.name}</span>
+                <span>{next.name}</span>
               </div>
-              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
                 <div className="h-full bg-gradient-to-r from-banditos-red to-banditos-gold rounded-full transition-all" style={{ width: `${progress}%` }} />
               </div>
               <p className="text-white/30 text-xs mt-1">{next.minPoints - player.total_points} pts to next level</p>
@@ -109,7 +108,7 @@ function ProfileContent() {
             <div className="flex flex-wrap justify-center gap-1.5">
               {LEVELS.map((l) => (
                 <span key={l.name} className={`text-xs px-2 py-0.5 rounded-full ${player.total_points >= l.minPoints ? "bg-banditos-gold/20 text-banditos-gold" : "bg-white/5 text-white/20"}`}>
-                  {l.emoji} {l.name}
+                  {l.name}
                 </span>
               ))}
             </div>
@@ -118,13 +117,15 @@ function ProfileContent() {
 
         <div className="mt-4 flex gap-3 justify-center">
           <button onClick={() => router.push("/leaderboard")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Leaderboard</button>
-          <span className="text-white/20">|</span>
+          <span className="text-white/20" aria-hidden="true">|</span>
           <button onClick={() => router.push("/play")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Play Trivia</button>
+          <span className="text-white/20" aria-hidden="true">|</span>
+          <button onClick={() => router.push("/")} className="text-banditos-gold/60 text-sm hover:text-banditos-gold">Home</button>
         </div>
       </div>
 
       <p className="mt-8 text-white/20 text-xs">Bandidos Mexican Cafe &middot; Franklin St, Chapel Hill NC</p>
-    </div>
+    </main>
   );
 }
 

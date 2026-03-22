@@ -8,7 +8,7 @@ import { BottomNav } from "@/components/BottomNav";
 interface WalletData {
   profile: {
     id: string; name: string; points: number; gamesPlayed: number;
-    bestStreak: number; rank: number; level: string; levelEmoji: string;
+    bestStreak: number; rank: number; level: string; levelBadge: string;
   };
   profileUrl: string;
 }
@@ -38,15 +38,15 @@ export default function WalletPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (loading) return <div className="min-h-screen bg-banditos-dark flex items-center justify-center"><BanditosLogo size="md" /></div>;
+  if (loading) return <div className="min-h-screen bg-banditos-dark flex items-center justify-center" role="status"><BanditosLogo size="md" /></div>;
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="md" />
-        <p className="text-white/60 mt-6">{error}</p>
+        <p className="text-white/60 mt-6" role="alert">{error}</p>
         <button onClick={() => router.push("/play")} className="mt-4 text-banditos-gold hover:underline">Log in to play</button>
-      </div>
+      </main>
     );
   }
 
@@ -54,23 +54,22 @@ export default function WalletPage() {
   const { profile } = data;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24">
-      {/* Header */}
+    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24">
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => router.push("/")} className="text-white/60 hover:text-white">← Back</button>
+        <button onClick={() => router.push("/")} className="text-white/60 hover:text-white" aria-label="Go back to home">&larr; Back</button>
         <BanditosLogo size="sm" />
         <div className="w-10" />
       </div>
 
-      <h1 className="text-center text-white text-2xl font-bold mb-2">Your Loyalty Card</h1>
+      <h1 className="text-center text-white text-2xl font-bold mb-2">Your Stats</h1>
       <p className="text-center text-white/40 text-sm mb-8">Your stats at a glance</p>
 
       <div className="max-w-sm mx-auto space-y-6">
-        {/* Digital Card Preview */}
+        {/* Digital Card */}
         <div className="bg-gradient-to-br from-banditos-red via-[#a01630] to-[#7a1025] rounded-2xl p-6 border border-white/10 shadow-2xl">
           <div className="flex items-center justify-between mb-4">
             <span className="text-white/80 text-xs font-bold tracking-wider uppercase">Bandidos Trivia</span>
-            <span className="text-2xl">{profile.levelEmoji}</span>
+            <span className="text-white/80 text-sm font-bold">{profile.levelBadge}</span>
           </div>
 
           <div className="text-center py-4">
@@ -92,15 +91,11 @@ export default function WalletPage() {
 
         {/* Share Profile */}
         <div className="bg-white/10 backdrop-blur rounded-2xl p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">🔗</span>
-            <div>
-              <h3 className="text-white font-bold">Share Your Profile</h3>
-              <p className="text-white/40 text-xs">Show off your stats to friends</p>
-            </div>
-          </div>
+          <h2 className="text-white font-bold mb-1">Share Your Profile</h2>
+          <p className="text-white/40 text-xs mb-3">Show off your stats to friends</p>
           <button
             onClick={copyProfileLink}
+            aria-label="Copy your profile link to clipboard"
             className="w-full bg-banditos-gold/20 text-banditos-gold py-3 rounded-xl font-medium border border-banditos-gold/30 hover:bg-banditos-gold/30 transition-colors"
           >
             {copied ? "Copied!" : "Copy Profile Link"}
@@ -109,6 +104,6 @@ export default function WalletPage() {
       </div>
 
       <BottomNav />
-    </div>
+    </main>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import QRCode from "qrcode";
 
 export default function QRSessionPage() {
   const params = useParams();
+  const router = useRouter();
   const code = (params.code as string).toUpperCase();
 
   const [dataUrl, setDataUrl] = useState("");
@@ -24,7 +25,6 @@ export default function QRSessionPage() {
       errorCorrectionLevel: "H",
     }).then(setDataUrl);
 
-    // Load session name
     fetch(`/api/qr-sessions?code=${code}`)
       .then(r => r.json())
       .then(d => { if (d.name) setSessionName(d.name); })
@@ -52,14 +52,15 @@ export default function QRSessionPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
-        <div className="no-print mb-4">
-          <a href="/admin" className="text-white/40 text-sm hover:text-white/60">&larr; Back to admin</a>
-        </div>
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+        <nav className="no-print mb-4 flex gap-4">
+          <button onClick={() => router.push("/")} className="text-white/40 text-sm hover:text-white/60">&larr; Home</button>
+          <button onClick={() => router.push("/admin?tab=qrcodes")} className="text-white/40 text-sm hover:text-white/60">Admin</button>
+        </nav>
 
         <div className="print-area bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
           <h1 className="text-3xl font-black text-[#1a0a2e] tracking-tight">
-            🌮 BANDITOS TRIVIA
+            BANDIDOS TRIVIA
           </h1>
           {sessionName && (
             <p className="text-[#C41E3A] font-bold text-lg mt-1">{sessionName}</p>
@@ -96,7 +97,7 @@ export default function QRSessionPage() {
             Links to: {joinUrl}
           </p>
         </div>
-      </div>
+      </main>
     </>
   );
 }

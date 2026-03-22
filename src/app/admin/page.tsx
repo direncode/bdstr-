@@ -396,7 +396,7 @@ function AdminContent() {
             onClick={() => { setTab(t); if (t === "attendance") loadAttendanceLogs(); if (t === "qrcodes") loadQrSessions(); if (t === "trivianight") loadTriviaNight(); }}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${tab === t ? "bg-banditos-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
           >
-            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "attendance" ? "Attendance" : t === "qrcodes" ? "QR Codes" : "🎤 Night"}
+            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "attendance" ? "Attendance" : t === "qrcodes" ? "QR Codes" : "Trivia Night"}
           </button>
         ))}
       </div>
@@ -529,7 +529,7 @@ function AdminContent() {
                 <button
                   onClick={handleAddRound}
                   disabled={saving || !newRoundName.trim() || !newRoundCategory.trim()}
-                  className="w-full bg-banditos-green text-white py-3 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                  className="w-full bg-green-600 text-white py-3 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
                 >
                   + Add Round
                 </button>
@@ -711,7 +711,7 @@ function AdminContent() {
                     <button
                       onClick={handleAddQuestion}
                       disabled={saving || !newQuestion.trim() || !newAnswer.trim()}
-                      className="bg-banditos-green text-white px-5 py-3 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
+                      className="bg-green-600 text-white px-5 py-3 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
                     >
                       + Add
                     </button>
@@ -824,7 +824,7 @@ function AdminContent() {
                   <button
                     onClick={handleCreateQr}
                     disabled={saving || !newQrName.trim()}
-                    className="self-end bg-banditos-green text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                    className="self-end bg-green-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
                   >
                     + Create
                   </button>
@@ -919,7 +919,7 @@ function AdminContent() {
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-white font-bold text-lg">🎤 Trivia Night</h2>
+                  <h2 className="text-white font-bold text-lg">Trivia Night</h2>
                   <p className="text-white/40 text-sm">Paper trivia at Bandidos — Tuesday 7-9 PM</p>
                 </div>
                 {!tnNight || tnNight.is_closed ? (

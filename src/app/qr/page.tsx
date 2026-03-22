@@ -23,7 +23,6 @@ export default function QRPage() {
         const active = (d.sessions || []).filter((s: QrSession) => s.is_active);
         setSessions(active);
 
-        // Generate QR codes for all sessions
         const base = window.location.origin;
         const images: Record<string, string> = {};
         for (const s of active) {
@@ -43,7 +42,7 @@ export default function QRPage() {
   const handlePrintAll = () => window.print();
 
   if (loading) {
-    return <div className="min-h-screen bg-banditos-dark flex items-center justify-center"><BanditosLogo size="md" /></div>;
+    return <div className="min-h-screen bg-banditos-dark flex items-center justify-center" role="status"><BanditosLogo size="md" /></div>;
   }
 
   return (
@@ -56,12 +55,12 @@ export default function QRPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6">
-        <div className="no-print flex items-center justify-between mb-6 max-w-4xl mx-auto">
-          <button onClick={() => router.push("/admin")} className="text-white/40 hover:text-white text-sm">&larr; Admin</button>
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6">
+        <nav className="no-print flex items-center justify-between mb-6 max-w-4xl mx-auto">
+          <button onClick={() => router.push("/")} className="text-white/40 hover:text-white text-sm" aria-label="Go back to home">&larr; Home</button>
           <BanditosLogo size="sm" />
           <button onClick={handlePrintAll} className="bg-banditos-gold text-banditos-dark px-4 py-2 rounded-xl font-bold text-sm">Print All</button>
-        </div>
+        </nav>
 
         <h1 className="no-print text-white text-2xl font-bold text-center mb-2">QR Codes</h1>
         <p className="no-print text-white/40 text-sm text-center mb-8">Print and place at Bandidos. Players scan to join trivia.</p>
@@ -69,17 +68,17 @@ export default function QRPage() {
         {sessions.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-white/40 text-lg">No QR codes yet.</p>
-            <button onClick={() => router.push("/admin")} className="mt-4 text-banditos-gold hover:underline">Create QR codes in Admin → QR Codes tab</button>
+            <button onClick={() => router.push("/admin?tab=qrcodes")} className="mt-4 text-banditos-gold hover:underline">Create QR codes in Admin</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {sessions.map((s) => (
               <div key={s.id} className="qr-card bg-white rounded-2xl p-6 text-center shadow-lg">
-                <h2 className="text-2xl font-black text-[#1a0a2e]">🌮 BANDITOS TRIVIA</h2>
+                <h2 className="text-2xl font-black text-[#1a0a2e]">BANDIDOS TRIVIA</h2>
                 <p className="text-[#C41E3A] font-bold text-lg mt-1">{s.name}</p>
                 <p className="text-[#1a0a2e]/60 text-sm">Scan to play!</p>
                 {qrImages[s.code] && (
-                  <img src={qrImages[s.code]} alt={`QR for ${s.name}`} className="mx-auto mt-3 w-48 h-48" />
+                  <img src={qrImages[s.code]} alt={`QR code for ${s.name}`} className="mx-auto mt-3 w-48 h-48" />
                 )}
                 <p className="text-[#1a0a2e]/30 text-xs font-mono mt-1">{s.code}</p>
                 <p className="text-[#1a0a2e]/60 text-xs font-medium mt-2">Bandidos &middot; Franklin St, Chapel Hill</p>
@@ -87,7 +86,7 @@ export default function QRPage() {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </>
   );
 }
