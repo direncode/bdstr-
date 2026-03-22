@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 import { BottomNav } from "@/components/BottomNav";
+import { NftCard } from "@/components/NftCard";
 import { getLevel, getNextLevel, getLevelProgress, LEVELS } from "@/lib/levels";
 
 interface Player {
@@ -36,11 +37,8 @@ export default function LeaderboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const podium = players.slice(0, 3);
-  const rest = players.slice(3);
-
   return (
-    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] pb-20 safe-bottom">
+    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] pb-32 safe-bottom">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white" aria-label="Go back to home">
@@ -69,37 +67,34 @@ export default function LeaderboardPage() {
           <p className="text-white/60 mt-4">No players yet. Be the first!</p>
         </div>
       ) : (
-        <>
-          {/* Podium */}
-          <div className="flex justify-center items-end gap-3 px-4 mb-8">
-            {podium[1] && <PodiumCard player={podium[1]} rank={2} height="h-32" />}
-            {podium[0] && <PodiumCard player={podium[0]} rank={1} height="h-40" />}
-            {podium[2] && <PodiumCard player={podium[2]} rank={3} height="h-28" />}
-          </div>
+        <div className="px-4 max-w-lg mx-auto space-y-3">
+          {players.map((player, i) => {
+            const rank = i + 1;
+            const level = getLevel(player.total_points);
+            const isTop3 = rank <= 3;
 
-          {/* Rest of leaderboard */}
-          <div className="px-4 pb-8 max-w-lg mx-auto space-y-2">
-            {rest.map((player, i) => {
-              const rank = i + 4;
-              const level = getLevel(player.total_points);
-              return (
-                <button
-                  key={player.id}
-                  onClick={() => setSelectedPlayer(player)}
-                  aria-label={`View ${player.display_name}, rank ${rank}, ${player.total_points} points`}
-                  className="w-full flex items-center gap-3 bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors text-left"
-                >
-                  <span className="text-white/40 font-bold w-8 text-center">#{rank}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{player.display_name}</p>
-                    <p className="text-white/40 text-xs">{level.name}</p>
-                  </div>
-                  <span className="text-banditos-gold font-bold">{player.total_points}</span>
-                </button>
-              );
-            })}
-          </div>
-        </>
+            return (
+              <button
+                key={player.id}
+                onClick={() => setSelectedPlayer(player)}
+                aria-label={`View ${player.display_name}, rank ${rank}, ${player.total_points} points`}
+                className="w-full text-left transition-transform active:scale-[0.98]"
+                style={{ height: isTop3 ? "64px" : "56px" }}
+              >
+                <NftCard
+                  name={player.display_name}
+                  points={player.total_points}
+                  level={level.name}
+                  levelBadge={level.badge}
+                  rank={rank}
+                  gamesPlayed={player.games_played}
+                  bestStreak={player.best_streak}
+                  compact
+                />
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {/* Player detail modal */}
@@ -112,33 +107,12 @@ export default function LeaderboardPage() {
   );
 }
 
-function PodiumCard({ player, rank, height }: { player: Player; rank: number; height: string }) {
-  const level = getLevel(player.total_points);
-  const medals = ["", "1st", "2nd", "3rd"];
-  const bgColors = ["", "from-yellow-500/30 to-yellow-600/10", "from-gray-400/20 to-gray-500/10", "from-amber-700/20 to-amber-800/10"];
-  const isTitan = rank === 1;
-
-  return (
-    <div
-      className={`flex-1 max-w-[140px] bg-gradient-to-b ${bgColors[rank]} backdrop-blur border ${isTitan ? "border-banditos-gold/50" : "border-white/10"} rounded-2xl p-3 ${height} flex flex-col items-center justify-end`}
-      role="article"
-      aria-label={`${medals[rank]} place: ${player.display_name}, ${player.total_points} points`}
-    >
-      {isTitan && <span className="text-xs font-bold text-banditos-gold tracking-wide">TRIVIA TITAN</span>}
-      <span className="text-lg font-bold text-banditos-gold mt-1">{medals[rank]}</span>
-      <p className="text-white font-bold text-sm text-center mt-1 truncate w-full">{player.display_name}</p>
-      <p className="text-banditos-gold font-bold text-lg">{player.total_points}</p>
-      <p className="text-white/40 text-xs">{isTitan ? "Trivia Titan" : level.name}</p>
-    </div>
-  );
-}
-
 function PlayerModal({ player, onClose }: { player: Player; onClose: () => void }) {
   const level = getLevel(player.total_points);
   const next = getNextLevel(player.total_points);
   const progress = getLevelProgress(player.total_points);
+  const rank = 0; // not available here, but modal shows other stats
 
-  // Close on Escape key
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handleKey);

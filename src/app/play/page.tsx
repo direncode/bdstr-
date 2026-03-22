@@ -193,7 +193,7 @@ export default function PlayPage() {
   // ============ GATE ============
   if (screen === "gate") {
     return (
-      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-20 safe-bottom">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-32 safe-bottom">
         <BanditosLogo size="lg" />
 
         {hasQrBonus && (
@@ -349,7 +349,7 @@ export default function PlayPage() {
     if (pct === 100) grade = "PERFECT"; else if (pct >= 80) grade = "Great job"; else if (pct >= 60) grade = "Nice work"; else if (pct >= 40) grade = "Not bad";
 
     return (
-      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-20 safe-bottom">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-32 safe-bottom">
         <div className="w-full max-w-sm text-center">
           <h1 className="text-white text-3xl font-bold">{gameResult.perfectRound ? "PERFECT ROUND!" : "Round Complete"}</h1>
           <p className="text-banditos-gold mt-1 font-medium">{grade}</p>

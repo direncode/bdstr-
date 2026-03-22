@@ -15,8 +15,8 @@ interface Round {
   questions: Question[];
 }
 
-type TabType = "game" | "rounds" | "questions" | "triviaadmin" | "qrcodes";
-const VALID_TABS: TabType[] = ["game", "rounds", "questions", "triviaadmin", "qrcodes"];
+type TabType = "game" | "rounds" | "questions" | "schedule" | "triviaadmin" | "qrcodes";
+const VALID_TABS: TabType[] = ["game", "rounds", "questions", "schedule", "triviaadmin", "qrcodes"];
 
 export default function AdminPage() {
   return (
@@ -353,7 +353,7 @@ function AdminContent() {
   const currentRoundQuestions = rounds.find((r) => r.id === selectedRoundId)?.questions || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24 safe-bottom">
+    <div className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-32 safe-bottom">
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white">← Back</button>
         <BanditosLogo size="sm" />
@@ -364,13 +364,13 @@ function AdminContent() {
 
       {/* Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
-        {(["game", "rounds", "questions", "triviaadmin", "qrcodes"] as const).map((t) => (
+        {(["game", "rounds", "questions", "schedule", "triviaadmin", "qrcodes"] as const).map((t) => (
           <button
             key={t}
             onClick={() => { setTab(t); if (t === "qrcodes") loadQrSessions(); if (t === "triviaadmin") loadTriviaNight(); }}
-            className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${tab === t ? "bg-banditos-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
+            className={`px-4 py-2 rounded-xl font-medium text-sm transition-all ${tab === t ? "bg-banditos-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
           >
-            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "triviaadmin" ? "Trivia Night" : "QR Codes"}
+            {{ game: "Game", rounds: "Rounds", questions: "Questions", schedule: "Schedule", triviaadmin: "Trivia Night", qrcodes: "QR Codes" }[t]}
           </button>
         ))}
       </div>
@@ -805,6 +805,144 @@ function AdminContent() {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {/* ==================== SCHEDULE TAB ==================== */}
+        {tab === "schedule" && (
+          <>
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-2">Round Assignment</h2>
+              <p className="text-white/40 text-sm mb-4">Assign rounds to specific days. Tap a day to add rounds, or remove them.</p>
+
+              {(() => {
+                const today = new Date();
+                const days: { date: string; label: string; dayName: string; fullDay: string; isToday: boolean; isPast: boolean }[] = [];
+                for (let i = 0; i < 14; i++) {
+                  const d = new Date(today);
+                  d.setDate(d.getDate() + i);
+                  const dateStr = d.toISOString().split("T")[0];
+                  days.push({
+                    date: dateStr,
+                    label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                    dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
+                    fullDay: d.toLocaleDateString("en-US", { weekday: "long" }),
+                    isToday: i === 0,
+                    isPast: false,
+                  });
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {days.map((day) => {
+                      const dayRounds = rounds.filter((r) => r.scheduled_date === day.date);
+                      const unscheduledRounds = rounds.filter((r) => !r.scheduled_date || r.scheduled_date !== day.date);
+
+                      return (
+                        <div
+                          key={day.date}
+                          className={`rounded-xl p-4 transition-colors ${
+                            day.isToday
+                              ? "bg-banditos-gold/10 border-2 border-banditos-gold/40"
+                              : "bg-white/5 border border-white/10"
+                          }`}
+                        >
+                          {/* Day header */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-bold text-base ${day.isToday ? "text-banditos-gold" : "text-white"}`}>
+                                {day.fullDay}
+                              </span>
+                              <span className="text-white/40 text-sm">{day.label}</span>
+                              {day.isToday && (
+                                <span className="text-[10px] bg-banditos-gold text-banditos-dark px-2 py-0.5 rounded-full font-black uppercase">
+                                  Today
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-white/30 text-xs">
+                              {dayRounds.length} round{dayRounds.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+
+                          {/* Assigned rounds */}
+                          {dayRounds.length > 0 && (
+                            <div className="space-y-1.5 mb-3">
+                              {dayRounds.map((r) => (
+                                <div
+                                  key={r.id}
+                                  className="flex items-center justify-between bg-banditos-red/15 border border-banditos-red/30 rounded-lg px-3 py-2"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-white font-medium text-sm">{r.name}</span>
+                                    <span className="text-white/40 text-xs ml-2">{r.questions.length} Q&apos;s</span>
+                                  </div>
+                                  <button
+                                    onClick={() => doAction("schedule-round", { roundId: r.id, date: "" })}
+                                    disabled={saving}
+                                    className="text-red-400/60 hover:text-red-400 text-sm px-2 py-1 rounded transition-colors shrink-0"
+                                    title="Remove from this day"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {dayRounds.length === 0 && (
+                            <p className="text-white/20 text-xs mb-3">No rounds assigned</p>
+                          )}
+
+                          {/* Add round selector */}
+                          {unscheduledRounds.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {rounds.map((r) => {
+                                const isAssignedHere = r.scheduled_date === day.date;
+                                if (isAssignedHere) return null;
+                                return (
+                                  <button
+                                    key={r.id}
+                                    onClick={() => doAction("schedule-round", { roundId: r.id, date: day.date })}
+                                    disabled={saving}
+                                    className="text-xs bg-white/5 text-white/50 px-3 py-1.5 rounded-lg hover:bg-white/15 hover:text-white transition-colors border border-white/10"
+                                  >
+                                    + {r.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Unscheduled rounds summary */}
+            {(() => {
+              const unscheduled = rounds.filter((r) => !r.scheduled_date);
+              if (unscheduled.length === 0) return null;
+              return (
+                <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+                  <h2 className="text-white font-bold text-lg mb-2">Unscheduled Rounds</h2>
+                  <p className="text-white/40 text-sm mb-3">These rounds haven&apos;t been assigned to any day yet.</p>
+                  <div className="space-y-2">
+                    {unscheduled.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <div>
+                          <p className="text-white font-medium text-sm">{r.name}</p>
+                          <p className="text-white/30 text-xs">{r.category} &middot; {r.questions.length} questions</p>
+                        </div>
+                        <span className="text-orange-400/60 text-xs">Not scheduled</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
 

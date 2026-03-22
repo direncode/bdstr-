@@ -133,7 +133,7 @@ export default function HomePage() {
   const totalQuestions = adminState?.rounds.reduce((sum, r) => sum + r.questions.length, 0) ?? 0;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-banditos-dark via-[#2a1a3e] to-banditos-dark px-4 pb-24 pt-8 safe-bottom">
+    <main className="min-h-screen bg-gradient-to-b from-banditos-dark via-[#2a1a3e] to-banditos-dark px-4 pb-32 pt-8 safe-bottom">
       {/* Logo */}
       <div className={`flex justify-center transition-all duration-1000 ${show ? "opacity-100 scale-100" : "opacity-0 scale-75"}`}>
         <BanditosLogo size="lg" />

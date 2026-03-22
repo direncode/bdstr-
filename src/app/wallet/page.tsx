@@ -55,7 +55,7 @@ export default function WalletPage() {
   const { profile } = data;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-24">
+    <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] px-4 py-6 pb-32">
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => router.push("/")} className="text-white/60 hover:text-white" aria-label="Go back to home">&larr; Back</button>
         <BanditosLogo size="sm" />
