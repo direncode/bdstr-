@@ -11,11 +11,27 @@ export async function POST() {
   const profile = await getSession();
   if (!profile) return NextResponse.json({ error: "Login required" }, { status: 401 });
 
-  // Use availableQuestions (busyness-limited) for completion calc
   const gameState = await getGameState();
   if (!gameState.activeRoundId) return NextResponse.json({ error: "No active round" }, { status: 400 });
 
-  const questions = gameState.availableQuestions;
+  // Check QR bonus early — QR players bypass busyness limit
+  const cookieStore = await cookies();
+  const qrCode = cookieStore.get("banditos_qr")?.value;
+  let hasQr = false;
+
+  if (qrCode) {
+    const { data: qrSession } = await supabase
+      .from("qr_sessions")
+      .select("id")
+      .eq("code", qrCode.toUpperCase())
+      .eq("claimed_by", profile.id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (qrSession) hasQr = true;
+  }
+
+  // QR players get all questions, others get busyness-limited
+  const questions = hasQr ? gameState.questions : gameState.availableQuestions;
   if (!questions.length) return NextResponse.json({ error: "No questions" }, { status: 400 });
 
   const qIds = questions.map((q) => q.id as string);
@@ -43,27 +59,14 @@ export async function POST() {
   if (correctCount === totalQuestions && totalQuestions > 0) bonusPoints = 25;
   if (maxStreak >= 5) bonusPoints += 15;
 
-  // Check for QR double points (in-store bonus)
-  const cookieStore = await cookies();
-  const qrCode = cookieStore.get("banditos_qr")?.value;
+  // Apply QR double points (in-store bonus) — already verified above
   let doublePoints = false;
   let doublePointsAdded = 0;
 
-  if (qrCode) {
-    // Verify the QR code is actually claimed by this player
-    const { data: qrSession } = await supabase
-      .from("qr_sessions")
-      .select("id, claimed_by")
-      .eq("code", qrCode.toUpperCase())
-      .eq("claimed_by", profile.id)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (qrSession) {
-      doublePoints = true;
-      // Double the earned points (question points + bonus)
-      doublePointsAdded = totalPoints + bonusPoints;
-    }
+  if (hasQr) {
+    doublePoints = true;
+    // Double the earned points (question points + bonus)
+    doublePointsAdded = totalPoints + bonusPoints;
   }
 
   const grandTotal = totalPoints + bonusPoints + doublePointsAdded;
