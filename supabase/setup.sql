@@ -158,6 +158,34 @@ create index if not exists idx_qr_sessions_code on qr_sessions(code);
 alter table qr_sessions enable row level security;
 create policy "Allow all on qr_sessions" on qr_sessions for all using (true) with check (true);
 
+-- 8. TRIVIA NIGHTS (weekly paper trivia sessions)
+create table if not exists trivia_nights (
+  id uuid default gen_random_uuid() primary key,
+  week_label text not null,
+  night_date date not null,
+  is_active boolean default true,
+  is_closed boolean default false,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_trivia_nights_date on trivia_nights(night_date);
+
+-- 9. TRIVIA NIGHT CHECK-INS
+create table if not exists trivia_night_checkins (
+  id uuid default gen_random_uuid() primary key,
+  night_id uuid references trivia_nights(id) on delete cascade,
+  player_id uuid references profiles(id) on delete cascade,
+  has_qr_bonus boolean default false,
+  points_awarded int default 0,
+  checked_in_at timestamptz default now(),
+  unique(night_id, player_id)
+);
+
+alter table trivia_nights enable row level security;
+alter table trivia_night_checkins enable row level security;
+create policy "Allow all on trivia_nights" on trivia_nights for all using (true) with check (true);
+create policy "Allow all on trivia_night_checkins" on trivia_night_checkins for all using (true) with check (true);
+
 -- ============================================================
 -- To make yourself admin: go to Table Editor → profiles →
 -- set is_admin to true for your row

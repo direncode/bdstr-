@@ -20,7 +20,7 @@ export default function AdminPage() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
-  const [tab, setTab] = useState<"game" | "rounds" | "questions" | "attendance" | "qrcodes">("game");
+  const [tab, setTab] = useState<"game" | "rounds" | "questions" | "attendance" | "qrcodes" | "trivianight">("game");
 
   // Busyness
   const [busyness, setBusyness] = useState<{ percent: number; questionsAllowed: number; label: string; source: string } | null>(null);
@@ -38,6 +38,12 @@ export default function AdminPage() {
   const [newQrName, setNewQrName] = useState("");
   const [newQrCount, setNewQrCount] = useState("1");
   const [qrLoading, setQrLoading] = useState(false);
+
+  // Trivia Night
+  const [tnNight, setTnNight] = useState<{ id: string; week_label: string; is_active: boolean; is_closed: boolean } | null>(null);
+  const [tnCheckins, setTnCheckins] = useState<{ id: string; player_id: string; player_name: string; has_qr_bonus: boolean; points_awarded: number }[]>([]);
+  const [tnPointInputs, setTnPointInputs] = useState<Record<string, string>>({});
+  const [tnLoading, setTnLoading] = useState(false);
 
   // Round form
   const [newRoundName, setNewRoundName] = useState("");
@@ -270,6 +276,58 @@ export default function AdminPage() {
     } finally { setSaving(false); }
   };
 
+  // Trivia Night handlers
+  const loadTriviaNight = async () => {
+    setTnLoading(true);
+    try {
+      const res = await fetch("/api/trivia-night?admin=true");
+      const data = await res.json();
+      setTnNight(data.night);
+      setTnCheckins(data.checkins || []);
+    } finally { setTnLoading(false); }
+  };
+
+  const openTriviaNight = async () => {
+    setSaving(true);
+    try {
+      await fetch("/api/trivia-night", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "open-night" }),
+      });
+      await loadTriviaNight();
+    } finally { setSaving(false); }
+  };
+
+  const awardTriviaNightPoints = async (checkinId: string) => {
+    const raw = tnPointInputs[checkinId];
+    const points = parseInt(raw);
+    if (isNaN(points) || points < 0) return;
+    setSaving(true);
+    try {
+      await fetch("/api/trivia-night", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "award-points", checkinId, points }),
+      });
+      await loadTriviaNight();
+      setTnPointInputs((prev) => ({ ...prev, [checkinId]: "" }));
+    } finally { setSaving(false); }
+  };
+
+  const closeTriviaNight = async () => {
+    if (!tnNight || !confirm("Close this Trivia Night? This will also reset all QR claims for next time.")) return;
+    setSaving(true);
+    try {
+      await fetch("/api/trivia-night", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "close-night", nightId: tnNight.id }),
+      });
+      await loadTriviaNight();
+    } finally { setSaving(false); }
+  };
+
   const handleBusynessOverride = async () => {
     const val = parseInt(busyOverride);
     if (isNaN(val) || val < 0 || val > 100) return;
@@ -316,13 +374,13 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex justify-center gap-2 mb-6 flex-wrap">
-        {(["game", "rounds", "questions", "attendance", "qrcodes"] as const).map((t) => (
+        {(["game", "rounds", "questions", "attendance", "qrcodes", "trivianight"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => { setTab(t); if (t === "attendance") loadAttendanceLogs(); if (t === "qrcodes") loadQrSessions(); }}
+            onClick={() => { setTab(t); if (t === "attendance") loadAttendanceLogs(); if (t === "qrcodes") loadQrSessions(); if (t === "trivianight") loadTriviaNight(); }}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${tab === t ? "bg-banditos-red text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}
           >
-            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "attendance" ? "Attendance" : "QR Codes"}
+            {t === "game" ? "Game" : t === "rounds" ? "Rounds" : t === "questions" ? "Questions" : t === "attendance" ? "Attendance" : t === "qrcodes" ? "QR Codes" : "🎤 Night"}
           </button>
         ))}
       </div>
@@ -835,6 +893,139 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+          </>
+        )}
+
+        {/* ==================== TRIVIA NIGHT TAB ==================== */}
+        {tab === "trivianight" && (
+          <>
+            {/* Open / Status */}
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-white font-bold text-lg">🎤 Trivia Night</h2>
+                  <p className="text-white/40 text-sm">Paper trivia at Bandidos — Tuesday 7-9 PM</p>
+                </div>
+                {!tnNight || tnNight.is_closed ? (
+                  <button
+                    onClick={openTriviaNight}
+                    disabled={saving}
+                    className="bg-green-500 text-white px-5 py-3 rounded-xl font-bold hover:bg-green-600 transition-colors disabled:opacity-40"
+                  >
+                    Open Night
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400 text-sm font-bold">LIVE</span>
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  </div>
+                )}
+              </div>
+
+              {tnNight && !tnNight.is_closed && (
+                <div className="bg-white/5 rounded-xl p-4">
+                  <p className="text-white font-medium">{tnNight.week_label}</p>
+                  <p className="text-white/40 text-xs mt-1">
+                    {tnCheckins.length} player{tnCheckins.length !== 1 ? "s" : ""} checked in
+                    &middot; {tnCheckins.filter(c => c.has_qr_bonus).length} with QR bonus (3x)
+                  </p>
+                </div>
+              )}
+
+              {tnNight?.is_closed && (
+                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                  <p className="text-white/50 text-sm">{tnNight.week_label} — Closed</p>
+                  <p className="text-white/30 text-xs mt-1">Open a new night to start a fresh session.</p>
+                </div>
+              )}
+
+              {!tnNight && !tnLoading && (
+                <p className="text-white/40 text-sm">No active night. Hit &quot;Open Night&quot; to start one for tonight.</p>
+              )}
+
+              {tnLoading && <p className="text-white/30 text-sm">Loading...</p>}
+            </div>
+
+            {/* Award Points */}
+            {tnNight && !tnNight.is_closed && (
+              <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+                <h2 className="text-white font-bold text-lg mb-2">Award Points</h2>
+                <p className="text-white/40 text-sm mb-4">
+                  Enter base points from paper trivia. Players with QR scan get <span className="text-green-400 font-bold">3x</span>, others get <span className="text-white font-bold">1x</span>.
+                </p>
+
+                {tnCheckins.length === 0 ? (
+                  <p className="text-white/30 text-center py-6">No players checked in yet. Players check in via the app during Tuesday 7-9 PM.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {tnCheckins.map((c) => (
+                      <div key={c.id} className={`rounded-xl p-4 ${c.has_qr_bonus ? "bg-green-500/10 border border-green-500/20" : "bg-white/5 border border-white/5"}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-white font-medium truncate">{c.player_name}</p>
+                              {c.has_qr_bonus && (
+                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold shrink-0">3x</span>
+                              )}
+                              {!c.has_qr_bonus && (
+                                <span className="text-xs bg-white/10 text-white/40 px-2 py-0.5 rounded-full shrink-0">1x</span>
+                              )}
+                            </div>
+                            {c.points_awarded > 0 && (
+                              <p className="text-banditos-gold text-xs mt-0.5">
+                                Awarded: {c.points_awarded} pts
+                                {c.has_qr_bonus && <span className="text-green-400"> (includes 3x)</span>}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="Pts"
+                              value={tnPointInputs[c.id] || ""}
+                              onChange={(e) => setTnPointInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                              className="w-20 bg-white/10 text-white rounded-lg px-3 py-2 text-sm placeholder-white/30 outline-none focus:ring-2 focus:ring-banditos-gold text-center"
+                            />
+                            <button
+                              onClick={() => awardTriviaNightPoints(c.id)}
+                              disabled={saving || !tnPointInputs[c.id]}
+                              className="bg-banditos-gold text-banditos-dark px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-40"
+                            >
+                              Award
+                            </button>
+                          </div>
+                        </div>
+                        {tnPointInputs[c.id] && parseInt(tnPointInputs[c.id]) > 0 && (
+                          <p className="text-white/30 text-xs mt-2">
+                            Preview: {tnPointInputs[c.id]} base × {c.has_qr_bonus ? "3" : "1"} = <span className="text-banditos-gold font-bold">{parseInt(tnPointInputs[c.id]) * (c.has_qr_bonus ? 3 : 1)} pts</span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Close Night */}
+            {tnNight && !tnNight.is_closed && (
+              <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-white font-bold text-lg">Close Night</h2>
+                    <p className="text-white/40 text-sm">End this session &amp; reset QR claims for next time</p>
+                  </div>
+                  <button
+                    onClick={closeTriviaNight}
+                    disabled={saving}
+                    className="bg-red-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors disabled:opacity-40"
+                  >
+                    Close Night
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
