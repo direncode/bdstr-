@@ -11,9 +11,75 @@
   --banditos-cream: #FFF8E7;
 }
 
+/* Use dvh for full-height layouts on mobile Safari (address bar aware) */
+html, body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Override Tailwind's min-h-screen to use dvh on Safari */
+@supports (min-height: 100dvh) {
+  .min-h-screen {
+    min-height: 100dvh !important;
+  }
+}
+
 body {
   background: var(--banditos-cream);
   color: var(--banditos-dark);
+}
+
+/* Prevent Safari zoom on inputs — must be >= 16px */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Safari safe area padding for fixed elements */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Fix min-h-screen on mobile Safari where 100vh includes address bar */
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Webkit backdrop-filter support */
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  .backdrop-blur {
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* Smooth scrolling but respect reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+
+/* Fix iOS overscroll bounce on page backgrounds */
+main {
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes pulse-glow {
@@ -32,4 +98,14 @@ body {
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* NFT Card animations — global so they work across Safari */
+@keyframes nft-sparkle {
+  0%, 100% { opacity: 0; -webkit-transform: scale(0); transform: scale(0); }
+  50% { opacity: 0.8; -webkit-transform: scale(1); transform: scale(1); }
+}
+@keyframes nft-glow-rotate {
+  0% { -webkit-filter: blur(8px) hue-rotate(0deg); filter: blur(8px) hue-rotate(0deg); }
+  100% { -webkit-filter: blur(8px) hue-rotate(360deg); filter: blur(8px) hue-rotate(360deg); }
 }

@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 import { BusynessBar } from "@/components/BusynessBar";
 import { BottomNav } from "@/components/BottomNav";
+import { NftCard } from "@/components/NftCard";
+
+interface WalletProfile {
+  name: string; points: number; level: string; levelBadge: string;
+  rank: number; gamesPlayed: number; bestStreak: number;
+}
 
 interface AdminState {
   isUnlocked: boolean;
@@ -28,6 +34,9 @@ export default function HomePage() {
   const [adminKeyError, setAdminKeyError] = useState("");
   const [adminKeySuccess, setAdminKeySuccess] = useState(false);
 
+  // Wallet / NFT card
+  const [walletProfile, setWalletProfile] = useState<WalletProfile | null>(null);
+
   // Admin dashboard
   const [adminState, setAdminState] = useState<AdminState | null>(null);
   const [adminSaving, setAdminSaving] = useState(false);
@@ -47,6 +56,7 @@ export default function HomePage() {
     fetch("/api/auth").then((r) => r.json()).then((d) => {
       setProfile(d.profile);
       if (d.profile) {
+        fetch("/api/wallet").then(r => r.json()).then(d => { if (d.profile) setWalletProfile(d.profile); }).catch(() => {});
         fetch("/api/trivia-night").then(r => r.json()).then(setTriviaNight).catch(() => {});
         if (d.profile.is_admin) loadAdminState();
       }
@@ -123,7 +133,7 @@ export default function HomePage() {
   const totalQuestions = adminState?.rounds.reduce((sum, r) => sum + r.questions.length, 0) ?? 0;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-banditos-dark via-[#2a1a3e] to-banditos-dark px-4 pb-24 pt-8">
+    <main className="min-h-screen bg-gradient-to-b from-banditos-dark via-[#2a1a3e] to-banditos-dark px-4 pb-24 pt-8 safe-bottom">
       {/* Logo */}
       <div className={`flex justify-center transition-all duration-1000 ${show ? "opacity-100 scale-100" : "opacity-0 scale-75"}`}>
         <BanditosLogo size="lg" />
@@ -138,6 +148,21 @@ export default function HomePage() {
         {profile ? (
           <>
             <p className="text-center text-white/70 text-sm">Welcome back, <span className="font-bold text-white">{profile.display_name}</span></p>
+
+            {/* NFT Loyalty Card */}
+            {walletProfile && (
+              <div className="flex justify-center py-2">
+                <NftCard
+                  name={walletProfile.name}
+                  points={walletProfile.points}
+                  level={walletProfile.level}
+                  levelBadge={walletProfile.levelBadge}
+                  rank={walletProfile.rank}
+                  gamesPlayed={walletProfile.gamesPlayed}
+                  bestStreak={walletProfile.bestStreak}
+                />
+              </div>
+            )}
 
             {/* Trivia Night Check-In */}
             {triviaNight?.isWindow && triviaNight.night && !triviaNight.checkedIn && !justCheckedIn && (
@@ -261,7 +286,7 @@ export default function HomePage() {
                         }`}
                       >
                         <span>{r.name}</span>
-                        <span className="text-xs ml-2 opacity-60">{r.questions.length} Q&apos;s &middot; {r.category}</span>
+                        <span className="text-xs ml-2 opacity-60">{r.questions.length} Q&apos;s &middot; 1 pt each</span>
                       </button>
                     ))}
                   </div>
@@ -280,17 +305,13 @@ export default function HomePage() {
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
                     Manage Rounds
                   </button>
-                  <button onClick={() => router.push("/admin?tab=trivianight")}
+                  <button onClick={() => router.push("/admin?tab=triviaadmin")}
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
                     Trivia Night
                   </button>
                   <button onClick={() => router.push("/admin?tab=qrcodes")}
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
                     QR Codes
-                  </button>
-                  <button onClick={() => router.push("/admin?tab=attendance")}
-                    className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">
-                    Attendance
                   </button>
                   <button onClick={() => router.push("/admin?tab=game")}
                     className="bg-purple-600/20 text-purple-300 py-3 rounded-2xl font-medium border border-purple-500/30 hover:bg-purple-600/30 transition-colors text-sm">

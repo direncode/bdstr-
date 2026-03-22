@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSession } from "@/lib/session";
 import { getGameState } from "@/lib/game-cache";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,25 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
 }
 
-// GET /api/game — game state + questions (limited by busyness)
+// Check if current player has a valid QR bonus
+async function hasValidQrBonus(profileId: string): Promise<boolean> {
+  const cookieStore = await cookies();
+  const qrCode = cookieStore.get("banditos_qr")?.value;
+  if (!qrCode) return false;
+
+  const supabase = await createServerSupabase();
+  const { data: qrSession } = await supabase
+    .from("qr_sessions")
+    .select("id")
+    .eq("code", qrCode.toUpperCase())
+    .eq("claimed_by", profileId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  return !!qrSession;
+}
+
+// GET /api/game — game state + questions (limited by busyness, bypassed by QR)
 export async function GET() {
   const [profile, gameState] = await Promise.all([
     getSession(),
@@ -25,8 +44,9 @@ export async function GET() {
     return NextResponse.json({ unlocked: true, round: null, questions: [], busyness: null });
   }
 
-  // Use availableQuestions (busyness-limited) instead of all questions
-  const questions = gameState.availableQuestions;
+  // QR players bypass busyness limit and get all 9 questions
+  const hasQr = profile ? await hasValidQrBonus(profile.id) : false;
+  const questions = hasQr ? gameState.questions : gameState.availableQuestions;
 
   // Get user's existing answers (only DB call that varies per-user)
   let answeredIds: string[] = [];
@@ -47,14 +67,16 @@ export async function GET() {
     questions: questions.map((q) => ({
       id: q.id,
       text: q.question,
-      points: q.points,
+      points: 1,
       order: q.sort_order,
       answered: answeredIds.includes(q.id as string),
     })),
+    todaysRounds: gameState.todaysRounds,
     busyness: {
       percent: gameState.busynessPercent,
-      questionsAllowed: gameState.questionsAllowed,
+      questionsAllowed: hasQr ? gameState.questions.length : gameState.questionsAllowed,
       totalInRound: gameState.questions.length,
+      qrBypass: hasQr,
     },
   });
 }
@@ -82,13 +104,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Already answered", isCorrect: existing.is_correct, points: existing.points });
   }
 
-  // Verify question is in the available set (busyness-limited)
+  // Verify question is in the available set (QR bypasses busyness limit)
   const gameState = await getGameState();
-  const question = gameState.availableQuestions.find((q) => q.id === questionId);
+  const hasQr = await hasValidQrBonus(profile.id);
+  const allowedQuestions = hasQr ? gameState.questions : gameState.availableQuestions;
+  const question = allowedQuestions.find((q) => q.id === questionId);
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
   const isCorrect = normalize(answer) === normalize(question.answer as string);
-  const points = isCorrect ? (question.points as number) : 0;
+  const points = isCorrect ? 1 : 0;
 
   // Save answer
   const { error: ansError } = await supabase.from("answers").insert({

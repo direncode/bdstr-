@@ -11,17 +11,16 @@ function getTuesdayLabel(date: Date): string {
 }
 
 function getTuesdayDate(now: Date): string {
-  // Returns YYYY-MM-DD for the current Tuesday
   return now.toISOString().split("T")[0];
 }
 
 function isTuesdayWindow(now: Date): boolean {
-  const day = now.getDay(); // 0=Sun, 2=Tue
+  const day = now.getDay();
   const hour = now.getHours();
-  return day === 2 && hour >= 19 && hour < 21; // Tuesday 7-9 PM
+  return day === 2 && hour >= 19 && hour < 21;
 }
 
-// GET /api/trivia-night — get current night status + check-in state
+// GET /api/trivia-night
 export async function GET(req: Request) {
   const supabase = await createServerSupabase();
   const profile = await getSession();
@@ -31,13 +30,12 @@ export async function GET(req: Request) {
   const now = new Date();
   const isWindow = isTuesdayWindow(now);
 
-  // Admin: get active night with all check-ins
+  // Admin: get active night with all check-ins and their round scores
   if (isAdminReq) {
     if (!profile?.is_admin) {
       return NextResponse.json({ error: "Admin required" }, { status: 403 });
     }
 
-    // Get the current active night (or most recent)
     const { data: night } = await supabase
       .from("trivia_nights")
       .select("*")
@@ -68,11 +66,28 @@ export async function GET(req: Request) {
       playerMap = Object.fromEntries((players || []).map((p) => [p.id, p.display_name]));
     }
 
+    // Get all round scores for these check-ins
+    const checkinIds = (checkins || []).map((c) => c.id);
+    let scoresMap: Record<string, { round_number: number; round_label: string; score: number }[]> = {};
+    if (checkinIds.length > 0) {
+      const { data: scores } = await supabase
+        .from("trivia_night_scores")
+        .select("checkin_id, round_number, round_label, score")
+        .in("checkin_id", checkinIds)
+        .order("round_number", { ascending: true });
+
+      for (const s of scores || []) {
+        if (!scoresMap[s.checkin_id]) scoresMap[s.checkin_id] = [];
+        scoresMap[s.checkin_id].push({ round_number: s.round_number, round_label: s.round_label, score: s.score });
+      }
+    }
+
     return NextResponse.json({
       night,
       checkins: (checkins || []).map((c) => ({
         ...c,
         player_name: playerMap[c.player_id] || "Unknown",
+        round_scores: scoresMap[c.id] || [],
       })),
       isWindow,
     });
@@ -80,11 +95,9 @@ export async function GET(req: Request) {
 
   // Player: get check-in status for current window
   if (!isWindow) {
-    // Also check if there's a recently closed night to show results
     return NextResponse.json({ isWindow: false, night: null, checkedIn: false });
   }
 
-  // Find or return the active night for today
   const today = getTuesdayDate(now);
   const { data: night } = await supabase
     .from("trivia_nights")
@@ -96,7 +109,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ isWindow: true, night: null, checkedIn: false });
   }
 
-  // Check if player is checked in
   let checkedIn = false;
   let hasQrBonus = false;
   if (profile) {
@@ -120,7 +132,7 @@ export async function GET(req: Request) {
   });
 }
 
-// POST /api/trivia-night — check-in, open night, award points, close night
+// POST /api/trivia-night
 export async function POST(req: Request) {
   const supabase = await createServerSupabase();
   const profile = await getSession();
@@ -131,21 +143,17 @@ export async function POST(req: Request) {
 
   // ========== PLAYER: CHECK IN ==========
   if (action === "checkin") {
-    const now = new Date();
-    if (!isTuesdayWindow(now)) {
-      return NextResponse.json({ error: "Trivia Night check-in is only available Tuesday 7-9 PM" }, { status: 400 });
-    }
-
-    const today = getTuesdayDate(now);
-    const { data: night } = await supabase
+    // Find any active night (admin may have opened it at any time)
+    const { data: activeNight } = await supabase
       .from("trivia_nights")
       .select("id")
-      .eq("night_date", today)
       .eq("is_active", true)
       .eq("is_closed", false)
+      .order("night_date", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (!night) {
+    if (!activeNight) {
       return NextResponse.json({ error: "No active Trivia Night session" }, { status: 404 });
     }
 
@@ -169,7 +177,7 @@ export async function POST(req: Request) {
     const { error } = await supabase
       .from("trivia_night_checkins")
       .upsert({
-        night_id: night.id,
+        night_id: activeNight.id,
         player_id: profile.id,
         has_qr_bonus: hasQrBonus,
       }, { onConflict: "night_id,player_id" });
@@ -192,7 +200,6 @@ export async function POST(req: Request) {
     const today = getTuesdayDate(now);
     const label = getTuesdayLabel(now);
 
-    // Check if one already exists for today
     const { data: existing } = await supabase
       .from("trivia_nights")
       .select("id")
@@ -200,7 +207,6 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (existing) {
-      // Reopen it
       await supabase
         .from("trivia_nights")
         .update({ is_active: true, is_closed: false })
@@ -218,14 +224,84 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, nightId: night.id });
   }
 
-  // Award points to a checked-in player
+  // Award round score to a checked-in player
+  if (action === "award-round-score") {
+    const { checkinId, roundNumber, roundLabel, score } = body;
+    if (!checkinId || typeof roundNumber !== "number" || typeof score !== "number" || score < 0) {
+      return NextResponse.json({ error: "Invalid params" }, { status: 400 });
+    }
+
+    // Verify the check-in exists and has QR bonus (must be linked to QR)
+    const { data: checkin } = await supabase
+      .from("trivia_night_checkins")
+      .select("id, player_id, has_qr_bonus")
+      .eq("id", checkinId)
+      .single();
+
+    if (!checkin) return NextResponse.json({ error: "Check-in not found" }, { status: 404 });
+
+    // Get existing score for this round (to calculate delta)
+    const { data: existingScore } = await supabase
+      .from("trivia_night_scores")
+      .select("score")
+      .eq("checkin_id", checkinId)
+      .eq("round_number", roundNumber)
+      .maybeSingle();
+
+    const previousScore = existingScore?.score || 0;
+    const multiplier = checkin.has_qr_bonus ? 3 : 1;
+    const finalScore = score * multiplier;
+    const previousFinal = previousScore * multiplier;
+    const pointsDelta = finalScore - previousFinal;
+
+    // Upsert the round score (store base score, multiplier applied on total)
+    await supabase
+      .from("trivia_night_scores")
+      .upsert({
+        checkin_id: checkinId,
+        round_number: roundNumber,
+        round_label: roundLabel || `Round ${roundNumber}`,
+        score,
+      }, { onConflict: "checkin_id,round_number" });
+
+    // Recalculate total points_awarded on check-in
+    const { data: allScores } = await supabase
+      .from("trivia_night_scores")
+      .select("score")
+      .eq("checkin_id", checkinId);
+
+    const totalBase = (allScores || []).reduce((sum, s) => sum + s.score, 0);
+    const totalFinal = totalBase * multiplier;
+
+    await supabase
+      .from("trivia_night_checkins")
+      .update({ points_awarded: totalFinal })
+      .eq("id", checkinId);
+
+    // Update player's total points with the delta
+    if (pointsDelta !== 0) {
+      const { data: player } = await supabase
+        .from("profiles")
+        .select("total_points")
+        .eq("id", checkin.player_id)
+        .single();
+
+      await supabase
+        .from("profiles")
+        .update({ total_points: Math.max(0, (player?.total_points || 0) + pointsDelta) })
+        .eq("id", checkin.player_id);
+    }
+
+    return NextResponse.json({ ok: true, baseScore: score, multiplier, finalScore, pointsDelta, totalAwarded: totalFinal });
+  }
+
+  // Legacy: Award points (single value) to a checked-in player
   if (action === "award-points") {
     const { checkinId, points } = body;
     if (!checkinId || typeof points !== "number" || points < 0) {
       return NextResponse.json({ error: "Invalid params" }, { status: 400 });
     }
 
-    // Get the check-in
     const { data: checkin } = await supabase
       .from("trivia_night_checkins")
       .select("id, player_id, has_qr_bonus, points_awarded")
@@ -234,21 +310,16 @@ export async function POST(req: Request) {
 
     if (!checkin) return NextResponse.json({ error: "Check-in not found" }, { status: 404 });
 
-    // Calculate final points: 3x if QR bonus, otherwise 1x
     const multiplier = checkin.has_qr_bonus ? 3 : 1;
     const finalPoints = points * multiplier;
-
-    // Undo previous award if any, then apply new
     const previousAward = checkin.points_awarded || 0;
     const pointsDelta = finalPoints - previousAward;
 
-    // Update check-in record
     await supabase
       .from("trivia_night_checkins")
       .update({ points_awarded: finalPoints })
       .eq("id", checkinId);
 
-    // Update player's total points
     if (pointsDelta !== 0) {
       const { data: player } = await supabase
         .from("profiles")
@@ -273,7 +344,7 @@ export async function POST(req: Request) {
       .update({ is_active: false, is_closed: true })
       .eq("id", nightId);
 
-    // Also reset all QR claims for next time
+    // Reset all QR claims for next time
     await supabase
       .from("qr_sessions")
       .update({ claimed_by: null, claimed_at: null })

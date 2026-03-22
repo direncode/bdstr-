@@ -13,7 +13,7 @@ interface RoundInfo { id: string; name: string; category: string }
 interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: string }
 interface GameComplete {
   correctCount: number; totalQuestions: number; totalPoints: number;
-  bonusPoints: number; maxStreak: number; perfectRound: boolean;
+  maxStreak: number; perfectRound: boolean;
   doublePoints: boolean; doublePointsAdded: number;
 }
 
@@ -142,7 +142,7 @@ export default function PlayPage() {
   // ============ AUTH ============
   if (screen === "auth") {
     return (
-      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 safe-bottom">
         <BanditosLogo size="md" />
 
         {hasQrBonus && (
@@ -193,7 +193,7 @@ export default function PlayPage() {
   // ============ GATE ============
   if (screen === "gate") {
     return (
-      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-20">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-20 safe-bottom">
         <BanditosLogo size="lg" />
 
         {hasQrBonus && (
@@ -271,7 +271,7 @@ export default function PlayPage() {
     if (!q) return null;
 
     return (
-      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col px-4 py-6">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col px-4 py-6 safe-bottom">
         <header className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <button onClick={() => setScreen("gate")} className="text-white/40 text-sm hover:text-white/60" aria-label="Back to lobby">&larr;</button>
@@ -288,7 +288,7 @@ export default function PlayPage() {
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6 mb-6">
             <p className="text-white text-xl font-bold leading-relaxed">{q.text}</p>
             <p className="text-banditos-gold/60 text-sm mt-2">
-              {q.points} points{hasQrBonus && <span className="text-green-400 ml-1">(2x = {q.points * 2})</span>}
+              1 point{hasQrBonus && <span className="text-green-400 ml-1">(2x = 2 pts)</span>}
             </p>
           </div>
 
@@ -349,14 +349,13 @@ export default function PlayPage() {
     if (pct === 100) grade = "PERFECT"; else if (pct >= 80) grade = "Great job"; else if (pct >= 60) grade = "Nice work"; else if (pct >= 40) grade = "Not bad";
 
     return (
-      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-20">
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4 pb-20 safe-bottom">
         <div className="w-full max-w-sm text-center">
           <h1 className="text-white text-3xl font-bold">{gameResult.perfectRound ? "PERFECT ROUND!" : "Round Complete"}</h1>
           <p className="text-banditos-gold mt-1 font-medium">{grade}</p>
           <div className="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 space-y-4 text-left">
             <div className="flex justify-between text-white"><span className="text-white/60">Correct</span><span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span></div>
             <div className="flex justify-between text-white"><span className="text-white/60">Points</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
-            {gameResult.bonusPoints > 0 && <div className="flex justify-between text-white"><span className="text-white/60">Bonus</span><span className="font-bold text-green-400">+{gameResult.bonusPoints}</span></div>}
             {gameResult.doublePoints && (
               <div className="flex justify-between text-white">
                 <span className="text-white/60">In-Store 2x</span>

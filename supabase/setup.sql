@@ -22,21 +22,22 @@ create index if not exists idx_profiles_session_token on profiles(session_token)
 -- Index for fast display_name lookups (login)
 create index if not exists idx_profiles_display_name on profiles(display_name);
 
--- 2. ROUNDS
+-- 2. ROUNDS (can be scheduled to specific dates for weekly planning)
 create table if not exists rounds (
   id uuid default gen_random_uuid() primary key,
   name text not null,
   category text not null,
-  sort_order int default 0
+  sort_order int default 0,
+  scheduled_date date  -- NULL = unscheduled, set to a date to auto-activate that day
 );
 
--- 3. QUESTIONS (text-based: question + answer)
+-- 3. QUESTIONS (text-based: question + answer, 1 point each)
 create table if not exists questions (
   id uuid default gen_random_uuid() primary key,
   round_id uuid references rounds(id) on delete cascade,
   question text not null,
   answer text not null,
-  points int default 10,
+  points int default 1,
   sort_order int default 0
 );
 
@@ -181,10 +182,23 @@ create table if not exists trivia_night_checkins (
   unique(night_id, player_id)
 );
 
+-- 10. TRIVIA NIGHT SCORES (per-round scoring linked to check-in)
+create table if not exists trivia_night_scores (
+  id uuid default gen_random_uuid() primary key,
+  checkin_id uuid references trivia_night_checkins(id) on delete cascade,
+  round_number int not null,
+  round_label text not null default '',
+  score int not null default 0,
+  created_at timestamptz default now(),
+  unique(checkin_id, round_number)
+);
+
 alter table trivia_nights enable row level security;
 alter table trivia_night_checkins enable row level security;
+alter table trivia_night_scores enable row level security;
 create policy "Allow all on trivia_nights" on trivia_nights for all using (true) with check (true);
 create policy "Allow all on trivia_night_checkins" on trivia_night_checkins for all using (true) with check (true);
+create policy "Allow all on trivia_night_scores" on trivia_night_scores for all using (true) with check (true);
 
 -- ============================================================
 -- To make yourself admin: go to Table Editor → profiles →

@@ -24,7 +24,13 @@ export function BottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-banditos-dark/95 backdrop-blur border-t border-white/10 z-50 pb-[env(safe-area-inset-bottom)]"
+      className="fixed bottom-0 left-0 right-0 border-t border-white/10 z-50"
+      style={{
+        background: "rgba(26,26,46,0.95)",
+        WebkitBackdropFilter: "blur(12px)",
+        backdropFilter: "blur(12px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
       role="navigation"
       aria-label="Main navigation"
     >
@@ -37,11 +43,12 @@ export function BottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
               onClick={() => router.push(item.path)}
               aria-label={`Go to ${item.label}`}
               aria-current={isActive ? "page" : undefined}
-              className={`flex flex-col items-center py-3 px-4 min-w-[60px] transition-colors ${
+              className={`flex flex-col items-center py-3 px-4 transition-colors ${
                 isActive
                   ? "text-banditos-gold font-bold"
-                  : "text-white/40 hover:text-white/70"
+                  : "text-white/40 active:text-white/70"
               }`}
+              style={{ minWidth: "48px", minHeight: "48px" }}
             >
               <span className="text-xs font-medium">{item.label}</span>
               {isActive && (
