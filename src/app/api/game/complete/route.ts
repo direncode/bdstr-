@@ -44,7 +44,7 @@ export async function POST() {
   const answerMap = new Map((answers || []).map((a) => [a.question_id, a]));
   const correctCount = (answers || []).filter((a) => a.is_correct).length;
   const totalQuestions = questions.length;
-  const totalPoints = (answers || []).reduce((sum, a) => sum + (a.points as number), 0);
+  const totalPoints = correctCount; // 1 point per correct answer, no bonuses
 
   // Calculate streak
   let currentStreak = 0;
@@ -55,26 +55,21 @@ export async function POST() {
     else { currentStreak = 0; }
   }
 
-  let bonusPoints = 0;
-  if (correctCount === totalQuestions && totalQuestions > 0) bonusPoints = 25;
-  if (maxStreak >= 5) bonusPoints += 15;
-
   // Apply QR double points (in-store bonus) — already verified above
   let doublePoints = false;
   let doublePointsAdded = 0;
 
   if (hasQr) {
     doublePoints = true;
-    // Double the earned points (question points + bonus)
-    doublePointsAdded = totalPoints + bonusPoints;
+    doublePointsAdded = totalPoints;
   }
 
-  const grandTotal = totalPoints + bonusPoints + doublePointsAdded;
+  const grandTotal = totalPoints + doublePointsAdded;
 
   await supabase
     .from("profiles")
     .update({
-      total_points: (profile.total_points || 0) + bonusPoints + doublePointsAdded,
+      total_points: (profile.total_points || 0) + doublePointsAdded,
       games_played: (profile.games_played || 0) + 1,
       best_streak: Math.max(profile.best_streak || 0, maxStreak),
     })
@@ -83,7 +78,7 @@ export async function POST() {
   return NextResponse.json({
     correctCount, totalQuestions,
     totalPoints: grandTotal,
-    bonusPoints, maxStreak,
+    maxStreak,
     perfectRound: correctCount === totalQuestions,
     doublePoints,
     doublePointsAdded,

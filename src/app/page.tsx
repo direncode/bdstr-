@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 import { BusynessBar } from "@/components/BusynessBar";
 import { BottomNav } from "@/components/BottomNav";
+import { NftCard } from "@/components/NftCard";
+
+interface WalletProfile {
+  name: string; points: number; level: string; levelBadge: string;
+  rank: number; gamesPlayed: number; bestStreak: number;
+}
 
 interface AdminState {
   isUnlocked: boolean;
@@ -28,6 +34,9 @@ export default function HomePage() {
   const [adminKeyError, setAdminKeyError] = useState("");
   const [adminKeySuccess, setAdminKeySuccess] = useState(false);
 
+  // Wallet / NFT card
+  const [walletProfile, setWalletProfile] = useState<WalletProfile | null>(null);
+
   // Admin dashboard
   const [adminState, setAdminState] = useState<AdminState | null>(null);
   const [adminSaving, setAdminSaving] = useState(false);
@@ -47,6 +56,7 @@ export default function HomePage() {
     fetch("/api/auth").then((r) => r.json()).then((d) => {
       setProfile(d.profile);
       if (d.profile) {
+        fetch("/api/wallet").then(r => r.json()).then(d => { if (d.profile) setWalletProfile(d.profile); }).catch(() => {});
         fetch("/api/trivia-night").then(r => r.json()).then(setTriviaNight).catch(() => {});
         if (d.profile.is_admin) loadAdminState();
       }
@@ -138,6 +148,21 @@ export default function HomePage() {
         {profile ? (
           <>
             <p className="text-center text-white/70 text-sm">Welcome back, <span className="font-bold text-white">{profile.display_name}</span></p>
+
+            {/* NFT Loyalty Card */}
+            {walletProfile && (
+              <div className="flex justify-center py-2">
+                <NftCard
+                  name={walletProfile.name}
+                  points={walletProfile.points}
+                  level={walletProfile.level}
+                  levelBadge={walletProfile.levelBadge}
+                  rank={walletProfile.rank}
+                  gamesPlayed={walletProfile.gamesPlayed}
+                  bestStreak={walletProfile.bestStreak}
+                />
+              </div>
+            )}
 
             {/* Trivia Night Check-In */}
             {triviaNight?.isWindow && triviaNight.night && !triviaNight.checkedIn && !justCheckedIn && (

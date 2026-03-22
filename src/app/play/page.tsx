@@ -13,7 +13,7 @@ interface RoundInfo { id: string; name: string; category: string }
 interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: string }
 interface GameComplete {
   correctCount: number; totalQuestions: number; totalPoints: number;
-  bonusPoints: number; maxStreak: number; perfectRound: boolean;
+  maxStreak: number; perfectRound: boolean;
   doublePoints: boolean; doublePointsAdded: number;
 }
 
@@ -356,7 +356,6 @@ export default function PlayPage() {
           <div className="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 space-y-4 text-left">
             <div className="flex justify-between text-white"><span className="text-white/60">Correct</span><span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span></div>
             <div className="flex justify-between text-white"><span className="text-white/60">Points</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
-            {gameResult.bonusPoints > 0 && <div className="flex justify-between text-white"><span className="text-white/60">Bonus</span><span className="font-bold text-green-400">+{gameResult.bonusPoints}</span></div>}
             {gameResult.doublePoints && (
               <div className="flex justify-between text-white">
                 <span className="text-white/60">In-Store 2x</span>

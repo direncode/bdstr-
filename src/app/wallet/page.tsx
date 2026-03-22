@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BanditosLogo } from "@/components/BanditosLogo";
 import { BottomNav } from "@/components/BottomNav";
+import { NftCard } from "@/components/NftCard";
 
 interface WalletData {
   profile: {
@@ -65,28 +66,17 @@ export default function WalletPage() {
       <p className="text-center text-white/40 text-sm mb-8">Your stats at a glance</p>
 
       <div className="max-w-sm mx-auto space-y-6">
-        {/* Digital Card */}
-        <div className="bg-gradient-to-br from-banditos-red via-[#a01630] to-[#7a1025] rounded-2xl p-6 border border-white/10 shadow-2xl">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-white/80 text-xs font-bold tracking-wider uppercase">Bandidos Trivia</span>
-            <span className="text-white/80 text-sm font-bold">{profile.levelBadge}</span>
-          </div>
-
-          <div className="text-center py-4">
-            <p className="text-banditos-gold text-4xl font-bold">{profile.points}</p>
-            <p className="text-white/60 text-sm">POINTS</p>
-          </div>
-
-          <div className="flex justify-between items-end">
-            <div>
-              <p className="text-white font-bold text-lg">{profile.name}</p>
-              <p className="text-white/50 text-xs">{profile.level} &middot; Rank #{profile.rank}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-white/40 text-xs">{profile.gamesPlayed} games</p>
-              <p className="text-white/40 text-xs">{profile.bestStreak} best streak</p>
-            </div>
-          </div>
+        {/* NFT Holographic Card */}
+        <div className="flex justify-center">
+          <NftCard
+            name={profile.name}
+            points={profile.points}
+            level={profile.level}
+            levelBadge={profile.levelBadge}
+            rank={profile.rank}
+            gamesPlayed={profile.gamesPlayed}
+            bestStreak={profile.bestStreak}
+          />
         </div>
 
         {/* Share Profile */}
