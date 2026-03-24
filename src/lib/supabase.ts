@@ -1,7 +1,6 @@
 // Types matching our DB schema
 export interface Profile {
   id: string;
-  email: string;
   display_name: string;
   password_hash: string;
   session_token: string | null;
@@ -9,6 +8,7 @@ export interface Profile {
   total_points: number;
   games_played: number;
   best_streak: number;
+  wallet_card_id: string | null;
   created_at: string;
 }
 

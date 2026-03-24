@@ -28,7 +28,6 @@ export default function PlayPage() {
 
   // Auth
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
-  const [authEmail, setAuthEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -89,7 +88,7 @@ export default function PlayPage() {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: authMode === "register" ? "register" : "login", email: authEmail.trim(), name: displayName.trim(), password }),
+        body: JSON.stringify({ mode: authMode === "register" ? "register" : "login", name: displayName.trim(), password }),
       });
       const data = await res.json();
       if (data.error) { setAuthError(data.error); setAuthLoading(false); return; }
@@ -168,26 +167,18 @@ export default function PlayPage() {
 
           <form onSubmit={handleAuth} className="space-y-3">
             <div>
-              <label htmlFor="auth-email" className="sr-only">Email</label>
-              <input id="auth-email" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="Email" autoFocus required
+              <label htmlFor="auth-name" className="sr-only">Display name</label>
+              <input id="auth-name" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={authMode === "register" ? "Choose a display name" : "Your display name"} autoFocus required
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg" />
             </div>
-            {authMode === "register" && (
-              <div>
-                <label htmlFor="auth-name" className="sr-only">Display name</label>
-                <input id="auth-name" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Display name (shown on leaderboard)" required
-                  className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
-              </div>
-            )}
             <div>
               <label htmlFor="auth-password" className="sr-only">Password</label>
               <input id="auth-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password" required minLength={4}
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
             </div>
-            <button type="submit" disabled={authLoading || !authEmail.trim() || (authMode === "register" && !displayName.trim())}
+            <button type="submit" disabled={authLoading || !displayName.trim()}
               className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50">
               {authLoading ? "Loading..." : authMode === "register" ? "JOIN" : "LOG IN"}
             </button>

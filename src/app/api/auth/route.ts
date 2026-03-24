@@ -10,41 +10,20 @@ export async function GET() {
   return NextResponse.json({ profile });
 }
 
-// POST /api/auth — register or login (email + password)
+// POST /api/auth — register or login (display_name + password)
 export async function POST(req: Request) {
   const supabase = await createServerSupabase();
-  const { mode, email, name, password } = await req.json();
+  const { mode, name, password } = await req.json();
 
-  if (!email?.trim() || !password) {
-    return NextResponse.json({ error: "Email and password required" }, { status: 400 });
+  if (!name?.trim() || !password) {
+    return NextResponse.json({ error: "Display name and password required" }, { status: 400 });
   }
 
-  const trimmedEmail = email.trim().toLowerCase();
-
-  // Basic email validation
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-    return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
-  }
+  const trimmedName = name.trim();
 
   if (mode === "register") {
-    if (!name?.trim()) {
-      return NextResponse.json({ error: "Display name is required" }, { status: 400 });
-    }
     if (password.length < 4) {
       return NextResponse.json({ error: "Password must be at least 4 characters" }, { status: 400 });
-    }
-
-    const trimmedName = name.trim();
-
-    // Check if email is taken
-    const { data: existingEmail } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", trimmedEmail)
-      .maybeSingle();
-
-    if (existingEmail) {
-      return NextResponse.json({ error: "An account with that email already exists" }, { status: 400 });
     }
 
     // Check if display name is taken
@@ -64,7 +43,6 @@ export async function POST(req: Request) {
     const { data: profile, error } = await supabase
       .from("profiles")
       .insert({
-        email: trimmedEmail,
         display_name: trimmedName,
         password_hash: pwHash,
         session_token: token,
@@ -84,11 +62,11 @@ export async function POST(req: Request) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("*")
-      .eq("email", trimmedEmail)
+      .eq("display_name", trimmedName)
       .maybeSingle();
 
     if (!profile) {
-      return NextResponse.json({ error: "No account with that email" }, { status: 400 });
+      return NextResponse.json({ error: "No account with that name" }, { status: 400 });
     }
 
     const valid = await verifyPassword(password, profile.password_hash);
