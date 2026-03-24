@@ -11,25 +11,59 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
 }
 
-// Check if current player has a valid QR bonus
-async function hasValidQrBonus(profileId: string): Promise<boolean> {
+// Parse QR cookie — returns { code, type } or null
+async function parseQrCookie(): Promise<{ code: string; type: string } | null> {
   const cookieStore = await cookies();
-  const qrCode = cookieStore.get("banditos_qr")?.value;
-  if (!qrCode) return false;
+  const raw = cookieStore.get("banditos_qr")?.value;
+  if (!raw) return null;
+  // Format: "CODE:type" or legacy "CODE" (defaults to inside)
+  const parts = raw.split(":");
+  return { code: parts[0], type: parts[1] || "inside" };
+}
+
+// Check if current player has a valid QR bonus, returns the type
+async function getQrBonus(profileId: string): Promise<{ hasQr: boolean; qrType: string }> {
+  const qrInfo = await parseQrCookie();
+  if (!qrInfo) return { hasQr: false, qrType: "none" };
 
   const supabase = await createServerSupabase();
-  const { data: qrSession } = await supabase
+
+  // Outside codes don't get claimed, just check if code exists and is active
+  if (qrInfo.type === "outside") {
+    const { data: session } = await supabase
+      .from("qr_sessions")
+      .select("id")
+      .eq("code", qrInfo.code.toUpperCase())
+      .eq("is_active", true)
+      .eq("qr_type", "outside")
+      .maybeSingle();
+    return { hasQr: !!session, qrType: "outside" };
+  }
+
+  // Inside and trivia_night codes must be claimed by this player
+  const { data: session } = await supabase
     .from("qr_sessions")
-    .select("id")
-    .eq("code", qrCode.toUpperCase())
+    .select("id, qr_type")
+    .eq("code", qrInfo.code.toUpperCase())
     .eq("claimed_by", profileId)
     .eq("is_active", true)
     .maybeSingle();
 
-  return !!qrSession;
+  if (!session) return { hasQr: false, qrType: "none" };
+  return { hasQr: true, qrType: session.qr_type || qrInfo.type };
 }
 
-// GET /api/game — game state + questions (limited by busyness, bypassed by QR)
+// Multiplier per QR type
+function getMultiplier(qrType: string): number {
+  switch (qrType) {
+    case "outside": return 1;
+    case "inside": return 2;
+    case "trivia_night": return 3;
+    default: return 1;
+  }
+}
+
+// GET /api/game — game state + questions
 export async function GET() {
   const [profile, gameState] = await Promise.all([
     getSession(),
@@ -44,11 +78,12 @@ export async function GET() {
     return NextResponse.json({ unlocked: true, round: null, questions: [], busyness: null });
   }
 
-  // QR players bypass busyness limit and get all 9 questions
-  const hasQr = profile ? await hasValidQrBonus(profile.id) : false;
-  const questions = hasQr ? gameState.questions : gameState.availableQuestions;
+  // Inside/trivia_night QR players bypass busyness limit
+  const qrBonus = profile ? await getQrBonus(profile.id) : { hasQr: false, qrType: "none" };
+  const bypassBusyness = qrBonus.hasQr && qrBonus.qrType !== "outside";
+  const questions = bypassBusyness ? gameState.questions : gameState.availableQuestions;
 
-  // Get user's existing answers (only DB call that varies per-user)
+  // Get user's existing answers
   let answeredIds: string[] = [];
   if (profile && questions.length > 0) {
     const supabase = await createServerSupabase();
@@ -74,10 +109,11 @@ export async function GET() {
     todaysRounds: gameState.todaysRounds,
     busyness: {
       percent: gameState.busynessPercent,
-      questionsAllowed: hasQr ? gameState.questions.length : gameState.questionsAllowed,
+      questionsAllowed: bypassBusyness ? gameState.questions.length : Math.min(gameState.questionsAllowed, gameState.questions.length),
       totalInRound: gameState.questions.length,
-      qrBypass: hasQr,
+      qrBypass: bypassBusyness,
     },
+    qrBonus: qrBonus.hasQr ? { type: qrBonus.qrType, multiplier: getMultiplier(qrBonus.qrType) } : null,
   });
 }
 
@@ -104,10 +140,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Already answered", isCorrect: existing.is_correct, points: existing.points });
   }
 
-  // Verify question is in the available set (QR bypasses busyness limit)
+  // Verify question is in the available set
   const gameState = await getGameState();
-  const hasQr = await hasValidQrBonus(profile.id);
-  const allowedQuestions = hasQr ? gameState.questions : gameState.availableQuestions;
+  const qrBonus = await getQrBonus(profile.id);
+  const bypassBusyness = qrBonus.hasQr && qrBonus.qrType !== "outside";
+  const allowedQuestions = bypassBusyness ? gameState.questions : gameState.availableQuestions;
   const question = allowedQuestions.find((q) => q.id === questionId);
   if (!question) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 

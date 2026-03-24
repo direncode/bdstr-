@@ -93,20 +93,18 @@ export async function GET(req: Request) {
     });
   }
 
-  // Player: get check-in status for current window
-  if (!isWindow) {
-    return NextResponse.json({ isWindow: false, night: null, checkedIn: false });
-  }
-
-  const today = getTuesdayDate(now);
+  // Player: get check-in status — check for any active night (not just Tuesday window)
   const { data: night } = await supabase
     .from("trivia_nights")
     .select("id, week_label, is_active, is_closed")
-    .eq("night_date", today)
+    .eq("is_active", true)
+    .eq("is_closed", false)
+    .order("night_date", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (!night || night.is_closed) {
-    return NextResponse.json({ isWindow: true, night: null, checkedIn: false });
+  if (!night) {
+    return NextResponse.json({ isWindow, night: null, checkedIn: false });
   }
 
   let checkedIn = false;
@@ -125,7 +123,7 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    isWindow: true,
+    isWindow: isWindow || !!night,
     night: { id: night.id, label: night.week_label, isActive: night.is_active },
     checkedIn,
     hasQrBonus,
@@ -159,10 +157,11 @@ export async function POST(req: Request) {
 
     // Check for QR bonus cookie
     const cookieStore = await cookies();
-    const qrCode = cookieStore.get("banditos_qr")?.value;
+    const qrRaw = cookieStore.get("banditos_qr")?.value;
     let hasQrBonus = false;
 
-    if (qrCode) {
+    if (qrRaw) {
+      const qrCode = qrRaw.split(":")[0]; // Parse "CODE:type" format
       const { data: qrSession } = await supabase
         .from("qr_sessions")
         .select("id")

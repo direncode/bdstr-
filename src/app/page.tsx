@@ -366,16 +366,7 @@ export default function HomePage() {
         ) : (
           /* Not logged in */
           <>
-            {(() => {
-              const now = new Date();
-              const isTuesday = now.getDay() === 2 && now.getHours() >= 19 && now.getHours() < 21;
-              return isTuesday ? (
-                <div className="w-full bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-400/30 rounded-2xl p-4 text-center" role="status">
-                  <p className="text-purple-300 font-bold">TRIVIA NIGHT IS LIVE</p>
-                  <p className="text-purple-300/60 text-xs mt-1">Sign in to check in and earn points</p>
-                </div>
-              ) : null;
-            })()}
+            {/* Trivia night banner shows for non-logged-in users when they scan a QR code */}
             <button onClick={() => router.push("/play")}
               aria-label="Enter and play trivia"
               className="w-full bg-banditos-red text-white py-4 rounded-2xl font-bold text-xl hover:bg-red-700 transition-colors">

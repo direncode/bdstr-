@@ -14,7 +14,7 @@ interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: stri
 interface GameComplete {
   correctCount: number; totalQuestions: number; totalPoints: number;
   maxStreak: number; perfectRound: boolean;
-  doublePoints: boolean; doublePointsAdded: number;
+  qrType: string; multiplier: number; bonusPoints: number;
 }
 
 type Screen = "auth" | "gate" | "playing" | "result" | "complete";
@@ -28,6 +28,7 @@ export default function PlayPage() {
 
   // Auth
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  const [authEmail, setAuthEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -47,8 +48,8 @@ export default function PlayPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const qrCode = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
-    if (qrCode) setHasQrBonus(true);
+    const qrCookie = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
+    if (qrCookie) setHasQrBonus(true);
 
     fetch("/api/auth")
       .then((r) => r.json())
@@ -88,7 +89,7 @@ export default function PlayPage() {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: authMode === "register" ? "register" : "login", name: displayName.trim(), password }),
+        body: JSON.stringify({ mode: authMode === "register" ? "register" : "login", email: authEmail.trim(), name: displayName.trim(), password }),
       });
       const data = await res.json();
       if (data.error) { setAuthError(data.error); setAuthLoading(false); return; }
@@ -167,18 +168,26 @@ export default function PlayPage() {
 
           <form onSubmit={handleAuth} className="space-y-3">
             <div>
-              <label htmlFor="auth-name" className="sr-only">Your name</label>
-              <input id="auth-name" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name" autoFocus required
+              <label htmlFor="auth-email" className="sr-only">Email</label>
+              <input id="auth-email" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="Email" autoFocus required
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg" />
             </div>
+            {authMode === "register" && (
+              <div>
+                <label htmlFor="auth-name" className="sr-only">Display name</label>
+                <input id="auth-name" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Display name (shown on leaderboard)" required
+                  className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
+              </div>
+            )}
             <div>
               <label htmlFor="auth-password" className="sr-only">Password</label>
               <input id="auth-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password" required minLength={4}
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
             </div>
-            <button type="submit" disabled={authLoading || !displayName.trim()}
+            <button type="submit" disabled={authLoading || !authEmail.trim() || (authMode === "register" && !displayName.trim())}
               className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50">
               {authLoading ? "Loading..." : authMode === "register" ? "JOIN" : "LOG IN"}
             </button>
@@ -280,7 +289,7 @@ export default function PlayPage() {
           <div className="text-right">
             <p className="text-banditos-gold font-bold">{currentIdx + 1}/{questions.length}</p>
             {streak > 0 && <p className="text-orange-400 text-xs">{streak} streak</p>}
-            {hasQrBonus && <p className="text-green-400 text-xs font-bold">2x PTS</p>}
+            {hasQrBonus && <p className="text-green-400 text-xs font-bold">BONUS PTS</p>}
           </div>
         </header>
 
@@ -356,10 +365,10 @@ export default function PlayPage() {
           <div className="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 space-y-4 text-left">
             <div className="flex justify-between text-white"><span className="text-white/60">Correct</span><span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span></div>
             <div className="flex justify-between text-white"><span className="text-white/60">Points</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
-            {gameResult.doublePoints && (
+            {gameResult.multiplier > 1 && (
               <div className="flex justify-between text-white">
-                <span className="text-white/60">In-Store 2x</span>
-                <span className="font-bold text-green-400">+{gameResult.doublePointsAdded}</span>
+                <span className="text-white/60">{gameResult.qrType === "trivia_night" ? "Trivia Night 3x" : "In-Store 2x"}</span>
+                <span className="font-bold text-green-400">+{gameResult.bonusPoints}</span>
               </div>
             )}
             <div className="flex justify-between text-white"><span className="text-white/60">Best Streak</span><span className="font-bold">{gameResult.maxStreak}</span></div>
