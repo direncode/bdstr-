@@ -1,6 +1,7 @@
 // Types matching our DB schema
 export interface Profile {
   id: string;
+  email: string;
   display_name: string;
   password_hash: string;
   session_token: string | null;

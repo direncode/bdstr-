@@ -67,7 +67,8 @@ export async function getGameState(): Promise<CachedGameState> {
 
   const round = (allRounds || []).find((r: Record<string, unknown>) => r.id === state.active_round_id);
   const roundQuestions = (allQuestions || []).filter((q: Record<string, unknown>) => q.round_id === state.active_round_id);
-  const allowed = busynessData.questionsAllowed;
+  // Cap allowed questions to the actual number of questions in the round
+  const allowed = Math.min(busynessData.questionsAllowed, roundQuestions.length);
   const availableQuestions = roundQuestions.slice(0, allowed);
 
   cache = {

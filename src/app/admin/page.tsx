@@ -980,6 +980,45 @@ function AdminContent() {
               </div>
             </div>
 
+            {/* Bulk Trivia Night Codes */}
+            <div className="bg-purple-500/10 border border-purple-500/30 backdrop-blur rounded-2xl p-6">
+              <h2 className="text-white font-bold text-lg mb-2">Trivia Night — Bulk Table Codes</h2>
+              <p className="text-white/40 text-sm mb-4">
+                Generate 25 table QR codes in one click. Each code auto-registers players, checks them in for trivia night, and activates their point multiplier. Print the page and cut them out.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      await fetch("/api/qr-sessions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "create", name: "Table", count: 25 }),
+                      });
+                      await loadQrSessions();
+                    } finally { setSaving(false); }
+                  }}
+                  disabled={saving}
+                  className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition-colors disabled:opacity-40"
+                >
+                  Generate 25 Table Codes
+                </button>
+                <button
+                  onClick={() => window.open("/qr?print=tables", "_blank")}
+                  className="bg-white/10 text-white px-5 py-3 rounded-xl font-medium hover:bg-white/20 transition-colors"
+                >
+                  Print All
+                </button>
+              </div>
+              {qrSessions.filter(s => s.name.startsWith("Table")).length > 0 && (
+                <p className="text-purple-300/60 text-xs mt-3">
+                  {qrSessions.filter(s => s.name.startsWith("Table")).length} table codes exist &middot;{" "}
+                  {qrSessions.filter(s => s.name.startsWith("Table") && s.claimed_by).length} claimed
+                </p>
+              )}
+            </div>
+
             {/* Reset All */}
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
               <div className="flex items-center justify-between">

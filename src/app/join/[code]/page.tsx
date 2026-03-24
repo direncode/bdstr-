@@ -25,6 +25,7 @@ export default function JoinPage() {
 
   // Auth state
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  const [authEmail, setAuthEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -57,6 +58,7 @@ export default function JoinPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: authMode === "register" ? "register" : "login",
+          email: authEmail.trim(),
           name: displayName.trim(),
           password,
         }),
@@ -258,18 +260,26 @@ export default function JoinPage() {
 
           <form onSubmit={handleAuth} className="space-y-3">
             <div>
-              <label htmlFor="join-name" className="sr-only">Your name</label>
-              <input id="join-name" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name" autoFocus required
+              <label htmlFor="join-email" className="sr-only">Email</label>
+              <input id="join-email" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="Email" autoFocus required
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg" />
             </div>
+            {authMode === "register" && (
+              <div>
+                <label htmlFor="join-name" className="sr-only">Display name</label>
+                <input id="join-name" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Display name" required
+                  className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
+              </div>
+            )}
             <div>
               <label htmlFor="join-password" className="sr-only">Password</label>
               <input id="join-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password" required minLength={4}
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
             </div>
-            <button type="submit" disabled={authLoading || !displayName.trim()}
+            <button type="submit" disabled={authLoading || !authEmail.trim() || (authMode === "register" && !displayName.trim())}
               className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50">
               {authLoading ? "Loading..." : authMode === "register" ? "JOIN & CHECK IN" : "LOG IN & CHECK IN"}
             </button>

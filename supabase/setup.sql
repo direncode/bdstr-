@@ -5,6 +5,7 @@
 -- 1. PROFILES (standalone — no Supabase Auth needed)
 create table if not exists profiles (
   id uuid default gen_random_uuid() primary key,
+  email text not null unique,
   display_name text not null unique,
   password_hash text not null,
   session_token text,
@@ -21,6 +22,9 @@ create index if not exists idx_profiles_session_token on profiles(session_token)
 
 -- Index for fast display_name lookups (login)
 create index if not exists idx_profiles_display_name on profiles(display_name);
+
+-- Index for fast email lookups (login)
+create index if not exists idx_profiles_email on profiles(email);
 
 -- 2. ROUNDS (can be scheduled to specific dates for weekly planning)
 create table if not exists rounds (

@@ -74,7 +74,7 @@ export async function GET() {
     todaysRounds: gameState.todaysRounds,
     busyness: {
       percent: gameState.busynessPercent,
-      questionsAllowed: hasQr ? gameState.questions.length : gameState.questionsAllowed,
+      questionsAllowed: hasQr ? gameState.questions.length : Math.min(gameState.questionsAllowed, gameState.questions.length),
       totalInRound: gameState.questions.length,
       qrBypass: hasQr,
     },
