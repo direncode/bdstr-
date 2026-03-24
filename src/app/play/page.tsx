@@ -14,7 +14,7 @@ interface AnswerResult { isCorrect: boolean; points: number; correctAnswer: stri
 interface GameComplete {
   correctCount: number; totalQuestions: number; totalPoints: number;
   maxStreak: number; perfectRound: boolean;
-  doublePoints: boolean; doublePointsAdded: number;
+  qrType: string; multiplier: number; bonusPoints: number;
 }
 
 type Screen = "auth" | "gate" | "playing" | "result" | "complete";
@@ -48,8 +48,8 @@ export default function PlayPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const qrCode = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
-    if (qrCode) setHasQrBonus(true);
+    const qrCookie = document.cookie.split("; ").find(c => c.startsWith("banditos_qr="))?.split("=")[1];
+    if (qrCookie) setHasQrBonus(true);
 
     fetch("/api/auth")
       .then((r) => r.json())
@@ -289,7 +289,7 @@ export default function PlayPage() {
           <div className="text-right">
             <p className="text-banditos-gold font-bold">{currentIdx + 1}/{questions.length}</p>
             {streak > 0 && <p className="text-orange-400 text-xs">{streak} streak</p>}
-            {hasQrBonus && <p className="text-green-400 text-xs font-bold">2x PTS</p>}
+            {hasQrBonus && <p className="text-green-400 text-xs font-bold">BONUS PTS</p>}
           </div>
         </header>
 
@@ -365,10 +365,10 @@ export default function PlayPage() {
           <div className="mt-6 bg-white/10 backdrop-blur rounded-2xl p-6 space-y-4 text-left">
             <div className="flex justify-between text-white"><span className="text-white/60">Correct</span><span className="font-bold">{gameResult.correctCount}/{gameResult.totalQuestions}</span></div>
             <div className="flex justify-between text-white"><span className="text-white/60">Points</span><span className="font-bold text-banditos-gold">{gameResult.totalPoints}</span></div>
-            {gameResult.doublePoints && (
+            {gameResult.multiplier > 1 && (
               <div className="flex justify-between text-white">
-                <span className="text-white/60">In-Store 2x</span>
-                <span className="font-bold text-green-400">+{gameResult.doublePointsAdded}</span>
+                <span className="text-white/60">{gameResult.qrType === "trivia_night" ? "Trivia Night 3x" : "In-Store 2x"}</span>
+                <span className="font-bold text-green-400">+{gameResult.bonusPoints}</span>
               </div>
             )}
             <div className="flex justify-between text-white"><span className="text-white/60">Best Streak</span><span className="font-bold">{gameResult.maxStreak}</span></div>

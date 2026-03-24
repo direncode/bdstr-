@@ -4,6 +4,10 @@ import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
+// Valid QR types: outside (1x), inside (2x), trivia_night (3x)
+type QrType = "outside" | "inside" | "trivia_night";
+const VALID_QR_TYPES: QrType[] = ["outside", "inside", "trivia_night"];
+
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const part = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
@@ -33,6 +37,7 @@ export async function GET(req: Request) {
       id: session.id,
       code: session.code,
       name: session.name,
+      qr_type: session.qr_type || "inside",
       claimed: !!session.claimed_by,
       claimedBy: session.claimed_by,
     });
@@ -46,7 +51,7 @@ export async function GET(req: Request) {
 
   const { data: sessions } = await supabase
     .from("qr_sessions")
-    .select("id, code, name, claimed_by, claimed_at, is_active, created_at")
+    .select("id, code, name, qr_type, claimed_by, claimed_at, is_active, created_at")
     .order("created_at", { ascending: false });
 
   // Get player names for claimed sessions
@@ -63,6 +68,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     sessions: (sessions || []).map(s => ({
       ...s,
+      qr_type: s.qr_type || "inside",
       claimed_name: s.claimed_by ? playerMap[s.claimed_by] || "Unknown" : null,
     })),
   });
@@ -91,9 +97,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid or inactive QR code" }, { status: 404 });
     }
 
+    const qrType = session.qr_type || "inside";
+
+    // Outside codes are never claimed — they're permanent/reusable
+    if (qrType === "outside") {
+      return NextResponse.json({ ok: true, qr_type: "outside" });
+    }
+
     // Already claimed by this player — that's fine
     if (session.claimed_by === profile.id) {
-      return NextResponse.json({ ok: true, alreadyClaimed: true });
+      return NextResponse.json({ ok: true, alreadyClaimed: true, qr_type: qrType });
     }
 
     // Already claimed by someone else
@@ -112,7 +125,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to claim — may have been taken" }, { status: 409 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, qr_type: qrType });
   }
 
   // Admin actions below
@@ -122,11 +135,12 @@ export async function POST(req: Request) {
   }
 
   if (action === "create") {
-    const { name, count = 1 } = body;
+    const { name, count = 1, qr_type = "inside" } = body;
+    const type = VALID_QR_TYPES.includes(qr_type) ? qr_type : "inside";
     const sessions = [];
     for (let i = 0; i < Math.min(count, 50); i++) {
       const label = count > 1 ? `${name} ${i + 1}` : name;
-      sessions.push({ code: generateCode(), name: label, is_active: true });
+      sessions.push({ code: generateCode(), name: label, qr_type: type, is_active: true });
     }
     const { error } = await supabase.from("qr_sessions").insert(sessions);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -134,10 +148,16 @@ export async function POST(req: Request) {
   }
 
   if (action === "reset-all") {
-    await supabase
+    const { qr_type } = body;
+    const query = supabase
       .from("qr_sessions")
       .update({ claimed_by: null, claimed_at: null })
       .eq("is_active", true);
+    // Optionally filter by type
+    if (qr_type && VALID_QR_TYPES.includes(qr_type)) {
+      query.eq("qr_type", qr_type);
+    }
+    await query;
     return NextResponse.json({ ok: true });
   }
 

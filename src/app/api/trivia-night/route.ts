@@ -157,10 +157,11 @@ export async function POST(req: Request) {
 
     // Check for QR bonus cookie
     const cookieStore = await cookies();
-    const qrCode = cookieStore.get("banditos_qr")?.value;
+    const qrRaw = cookieStore.get("banditos_qr")?.value;
     let hasQrBonus = false;
 
-    if (qrCode) {
+    if (qrRaw) {
+      const qrCode = qrRaw.split(":")[0]; // Parse "CODE:type" format
       const { data: qrSession } = await supabase
         .from("qr_sessions")
         .select("id")

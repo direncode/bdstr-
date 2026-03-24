@@ -152,6 +152,7 @@ create table if not exists qr_sessions (
   id uuid default gen_random_uuid() primary key,
   code text not null unique,
   name text not null,
+  qr_type text not null default 'inside', -- 'outside', 'inside', 'trivia_night'
   claimed_by uuid references profiles(id) on delete set null,
   claimed_at timestamptz,
   is_active boolean default true,

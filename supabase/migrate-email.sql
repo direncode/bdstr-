@@ -10,3 +10,7 @@ UPDATE profiles SET email = LOWER(REPLACE(display_name, ' ', '')) || '@bandidos.
 -- Now make it NOT NULL and UNIQUE
 ALTER TABLE profiles ALTER COLUMN email SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
+
+-- Add qr_type column to qr_sessions
+ALTER TABLE qr_sessions ADD COLUMN IF NOT EXISTS qr_type text NOT NULL DEFAULT 'inside';
+
