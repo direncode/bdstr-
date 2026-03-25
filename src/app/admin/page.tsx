@@ -48,6 +48,9 @@ function AdminContent() {
   const [newQrName, setNewQrName] = useState("");
   const [newQrCount, setNewQrCount] = useState("1");
   const [qrLoading, setQrLoading] = useState(false);
+  const [outsideCount, setOutsideCount] = useState("1");
+  const [insideCount, setInsideCount] = useState("25");
+  const [triviaNightCount, setTriviaNightCount] = useState("25");
 
   // Trivia Night Admin
   const [tnNight, setTnNight] = useState<{ id: string; week_label: string; is_active: boolean; is_closed: boolean } | null>(null);
@@ -956,16 +959,25 @@ function AdminContent() {
                 <h2 className="text-white font-bold text-lg">Outside — Storefront QR</h2>
               </div>
               <p className="text-white/40 text-sm mb-4">Permanent code for the window/door. Links to the platform — players sign up and play at normal 1x points. Never gets claimed, always reusable.</p>
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={outsideCount}
+                  onChange={(e) => setOutsideCount(e.target.value)}
+                  className="w-20 bg-white/10 text-white text-center py-3 rounded-xl font-bold border border-blue-500/30 focus:outline-none focus:border-blue-400"
+                />
                 <button
                   onClick={async () => {
+                    const count = Math.max(1, Math.min(100, parseInt(outsideCount) || 1));
                     setSaving(true);
-                    try { await fetch("/api/qr-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: "Storefront", count: 1, qr_type: "outside" }) }); await loadQrSessions(); } finally { setSaving(false); }
+                    try { await fetch("/api/qr-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: "Storefront", count, qr_type: "outside" }) }); await loadQrSessions(); } finally { setSaving(false); }
                   }}
                   disabled={saving}
                   className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-40"
                 >
-                  Generate Storefront Code
+                  Generate Storefront Code{parseInt(outsideCount) > 1 ? "s" : ""}
                 </button>
                 <button onClick={() => window.open("/qr?print=outside", "_blank")} className="bg-white/10 text-white px-5 py-3 rounded-xl font-medium hover:bg-white/20 transition-colors">Print</button>
               </div>
@@ -979,16 +991,25 @@ function AdminContent() {
                 <h2 className="text-white font-bold text-lg">Inside — Table QR Codes</h2>
               </div>
               <p className="text-white/40 text-sm mb-4">One per table. Players scan, sign up, and get 2x points on daily trivia rounds. Bypasses busyness question limit. Claimable — one player per code.</p>
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={insideCount}
+                  onChange={(e) => setInsideCount(e.target.value)}
+                  className="w-20 bg-white/10 text-white text-center py-3 rounded-xl font-bold border border-green-500/30 focus:outline-none focus:border-green-400"
+                />
                 <button
                   onClick={async () => {
+                    const count = Math.max(1, Math.min(100, parseInt(insideCount) || 25));
                     setSaving(true);
-                    try { await fetch("/api/qr-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: "Table", count: 25, qr_type: "inside" }) }); await loadQrSessions(); } finally { setSaving(false); }
+                    try { await fetch("/api/qr-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: "Table", count, qr_type: "inside" }) }); await loadQrSessions(); } finally { setSaving(false); }
                   }}
                   disabled={saving}
                   className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition-colors disabled:opacity-40"
                 >
-                  Generate 25 Table Codes
+                  Generate {insideCount} Table Code{parseInt(insideCount) !== 1 ? "s" : ""}
                 </button>
                 <button onClick={() => window.open("/qr?print=inside", "_blank")} className="bg-white/10 text-white px-5 py-3 rounded-xl font-medium hover:bg-white/20 transition-colors">Print</button>
               </div>
@@ -1005,16 +1026,25 @@ function AdminContent() {
                 <h2 className="text-white font-bold text-lg">Trivia Night — Check-In Codes</h2>
               </div>
               <p className="text-white/40 text-sm mb-4">Special codes for Trivia Night. Players scan → auto check-in → 3x multiplier on all rounds. One per person. Reset after each night.</p>
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={triviaNightCount}
+                  onChange={(e) => setTriviaNightCount(e.target.value)}
+                  className="w-20 bg-white/10 text-white text-center py-3 rounded-xl font-bold border border-purple-500/30 focus:outline-none focus:border-purple-400"
+                />
                 <button
                   onClick={async () => {
+                    const count = Math.max(1, Math.min(100, parseInt(triviaNightCount) || 25));
                     setSaving(true);
-                    try { await fetch("/api/qr-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: "Trivia Night", count: 25, qr_type: "trivia_night" }) }); await loadQrSessions(); } finally { setSaving(false); }
+                    try { await fetch("/api/qr-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: "Trivia Night", count, qr_type: "trivia_night" }) }); await loadQrSessions(); } finally { setSaving(false); }
                   }}
                   disabled={saving}
                   className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition-colors disabled:opacity-40"
                 >
-                  Generate 25 Trivia Night Codes
+                  Generate {triviaNightCount} Trivia Night Code{parseInt(triviaNightCount) !== 1 ? "s" : ""}
                 </button>
                 <button onClick={() => window.open("/qr?print=trivia_night", "_blank")} className="bg-white/10 text-white px-5 py-3 rounded-xl font-medium hover:bg-white/20 transition-colors">Print</button>
               </div>

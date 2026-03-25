@@ -14,8 +14,7 @@ export default function QRSessionPage() {
   const [sessionName, setSessionName] = useState("");
 
   useEffect(() => {
-    const base = window.location.origin;
-    const url = `${base}/join/${code}`;
+    const url = `https://bandidostrivia.com/join/${code}`;
     setJoinUrl(url);
 
     QRCode.toDataURL(url, {

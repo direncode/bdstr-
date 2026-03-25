@@ -46,11 +46,10 @@ function QRContent() {
 
         setSessions(active);
 
-        const base = window.location.origin;
         const images: Record<string, string> = {};
         for (const s of active) {
           const meta = TYPE_META[s.qr_type || "inside"] || TYPE_META.inside;
-          images[s.code] = await QRCode.toDataURL(`${base}/join/${s.code}`, {
+          images[s.code] = await QRCode.toDataURL(`https://bandidostrivia.com/join/${s.code}`, {
             width: 400,
             margin: 2,
             color: { dark: meta.color, light: "#ffffff" },
@@ -112,7 +111,9 @@ function QRContent() {
               return (
                 <div key={s.id} className="qr-card rounded-2xl p-5 text-center shadow-lg" style={{ background: m.cardBg }}>
                   <h2 className="text-lg font-black" style={{ color: "#1a0a2e" }}>BANDIDOS TRIVIA</h2>
-                  <p className="font-bold text-base mt-0.5" style={{ color: m.color }}>{s.name}</p>
+                  {s.qr_type !== "outside" && (
+                    <p className="font-bold text-base mt-0.5" style={{ color: m.color }}>{s.name}</p>
+                  )}
                   <p className="text-xs font-bold mt-0.5" style={{ color: m.color }}>{m.multiplier} POINTS</p>
                   <p className="text-xs mt-0.5" style={{ color: "#1a0a2e", opacity: 0.5 }}>{m.subtitle}</p>
                   {qrImages[s.code] && (
