@@ -6,14 +6,15 @@ import { BanditosLogo } from "@/components/BanditosLogo";
 
 interface QrSession {
   id: string; code: string; name: string;
-  qr_type: "outside" | "inside" | "trivia_night";
+  qr_type: "outside" | "inside" | "trivia_night" | "scouting";
   claimed: boolean; claimedBy: string | null;
 }
 
-const TIER_INFO = {
+const TIER_INFO: Record<string, { label: string; color: string; bg: string; border: string; desc: string }> = {
   outside: { label: "1x Points", color: "text-blue-300", bg: "bg-blue-500/20", border: "border-blue-500/40", desc: "Welcome to Bandidos Trivia! Sign up to play." },
   inside: { label: "2x Points", color: "text-green-300", bg: "bg-green-500/20", border: "border-green-500/40", desc: "You're at Bandidos — double points on all trivia!" },
   trivia_night: { label: "3x Points", color: "text-purple-300", bg: "bg-purple-500/20", border: "border-purple-500/40", desc: "Trivia Night! Triple points on all rounds tonight." },
+  scouting: { label: "Play Trivia", color: "text-orange-300", bg: "bg-orange-500/20", border: "border-orange-500/40", desc: "Welcome to Bandidos Trivia! Sign up to play." },
 };
 
 export default function JoinPage() {
@@ -114,11 +115,11 @@ export default function JoinPage() {
   // Auto-claim when logged in and session is available
   useEffect(() => {
     if (profile && qrSession && !claiming && !claimed) {
-      // Outside codes never need claiming
-      if (qrSession.qr_type === "outside") {
-        document.cookie = `banditos_qr=${code}:outside; path=/; max-age=${60 * 60 * 12}; samesite=lax`;
+      // Outside and scouting codes never need claiming
+      if (qrSession.qr_type === "outside" || qrSession.qr_type === "scouting") {
+        document.cookie = `banditos_qr=${code}:${qrSession.qr_type}; path=/; max-age=${60 * 60 * 12}; samesite=lax`;
         setClaimed(true);
-        setCheckInFailed(true); // no trivia check-in for outside
+        setCheckInFailed(true); // no trivia check-in
         return;
       }
       if (!qrSession.claimed) {
@@ -180,6 +181,22 @@ export default function JoinPage() {
             <p className="text-green-300 font-bold text-2xl">2x POINTS</p>
             <p className="text-green-300/60 text-xs mt-1">Double points on today&apos;s trivia questions</p>
           </div>
+        </div>
+        <button onClick={() => router.push("/play")} className="mt-6 bg-banditos-red text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
+          Play Trivia
+        </button>
+      </main>
+    );
+  }
+
+  // ===== SUCCESS: Scouting =====
+  if (claimed && qrType === "scouting") {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
+        <BanditosLogo size="md" />
+        <div className="mt-8 bg-orange-500/20 border border-orange-500/40 rounded-2xl p-8 text-center max-w-sm w-full" role="status">
+          <h2 className="text-orange-300 text-2xl font-bold">Welcome to Bandidos Trivia!</h2>
+          <p className="text-orange-300/70 mt-2">Play trivia, earn points, climb the leaderboard.</p>
         </div>
         <button onClick={() => router.push("/play")} className="mt-6 bg-banditos-red text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
           Play Trivia
@@ -252,7 +269,7 @@ export default function JoinPage() {
   }
 
   // Already claimed by someone else
-  if (qrSession?.claimed && profile && qrSession.claimedBy !== profile.id && qrType !== "outside") {
+  if (qrSession?.claimed && profile && qrSession.claimedBy !== profile.id && qrType !== "outside" && qrType !== "scouting") {
     return (
       <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
         <BanditosLogo size="md" />

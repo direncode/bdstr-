@@ -51,6 +51,7 @@ function AdminContent() {
   const [outsideCount, setOutsideCount] = useState("1");
   const [insideCount, setInsideCount] = useState("25");
   const [triviaNightCount, setTriviaNightCount] = useState("25");
+  const [scoutingCount, setScoutingCount] = useState("1");
 
   // Trivia Night Admin
   const [tnNight, setTnNight] = useState<{ id: string; week_label: string; is_active: boolean; is_closed: boolean } | null>(null);
@@ -1052,6 +1053,38 @@ function AdminContent() {
                 {qrSessions.filter((s: Record<string, unknown>) => s.qr_type === "trivia_night").length} trivia night codes &middot;{" "}
                 {qrSessions.filter((s: Record<string, unknown>) => s.qr_type === "trivia_night" && s.claimed_by).length} claimed
               </p>
+            </div>
+
+            {/* ---- SCOUTING ---- */}
+            <div className="bg-orange-500/10 border border-orange-500/30 backdrop-blur rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full font-bold">Scout</span>
+                <h2 className="text-white font-bold text-lg">Scouting — Outreach QR</h2>
+              </div>
+              <p className="text-white/40 text-sm mb-4">Outreach codes with Instagram group chat + platform QR side by side. Normal points, never claimed, always reusable.</p>
+              <div className="flex gap-3 items-center">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={scoutingCount}
+                  onChange={(e) => setScoutingCount(e.target.value)}
+                  className="w-20 bg-white/10 text-white text-center py-3 rounded-xl font-bold border border-orange-500/30 focus:outline-none focus:border-orange-400"
+                />
+                <button
+                  onClick={async () => {
+                    const count = Math.max(1, Math.min(100, parseInt(scoutingCount) || 1));
+                    setSaving(true);
+                    try { await fetch("/api/qr-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", name: "Scouting", count, qr_type: "scouting" }) }); await loadQrSessions(); } finally { setSaving(false); }
+                  }}
+                  disabled={saving}
+                  className="flex-1 bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 transition-colors disabled:opacity-40"
+                >
+                  Generate Scouting Code{parseInt(scoutingCount) > 1 ? "s" : ""}
+                </button>
+                <button onClick={() => window.open("/qr?print=scouting", "_blank")} className="bg-white/10 text-white px-5 py-3 rounded-xl font-medium hover:bg-white/20 transition-colors">Print</button>
+              </div>
+              <p className="text-orange-300/40 text-xs mt-2">{qrSessions.filter((s: Record<string, unknown>) => s.qr_type === "scouting").length} scouting code{qrSessions.filter((s: Record<string, unknown>) => s.qr_type === "scouting").length !== 1 ? "s" : ""} exist</p>
             </div>
 
             {/* Reset Claims */}

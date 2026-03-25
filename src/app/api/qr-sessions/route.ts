@@ -4,9 +4,9 @@ import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-// Valid QR types: outside (1x), inside (2x), trivia_night (3x)
-type QrType = "outside" | "inside" | "trivia_night";
-const VALID_QR_TYPES: QrType[] = ["outside", "inside", "trivia_night"];
+// Valid QR types: outside (1x), inside (2x), trivia_night (3x), scouting (1x)
+type QrType = "outside" | "inside" | "trivia_night" | "scouting";
+const VALID_QR_TYPES: QrType[] = ["outside", "inside", "trivia_night", "scouting"];
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -99,9 +99,9 @@ export async function POST(req: Request) {
 
     const qrType = session.qr_type || "inside";
 
-    // Outside codes are never claimed — they're permanent/reusable
-    if (qrType === "outside") {
-      return NextResponse.json({ ok: true, qr_type: "outside" });
+    // Outside and scouting codes are never claimed — they're permanent/reusable
+    if (qrType === "outside" || qrType === "scouting") {
+      return NextResponse.json({ ok: true, qr_type: qrType });
     }
 
     // Already claimed by this player — that's fine
