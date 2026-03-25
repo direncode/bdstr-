@@ -14,20 +14,33 @@ export default function QRSessionPage() {
   const [sessionName, setSessionName] = useState("");
 
   useEffect(() => {
-    const url = `https://bandidostrivia.com/join/${code}`;
-    setJoinUrl(url);
-
-    QRCode.toDataURL(url, {
-      width: 600,
-      margin: 2,
-      color: { dark: "#1a0a2e", light: "#ffffff" },
-      errorCorrectionLevel: "H",
-    }).then(setDataUrl);
-
     fetch(`/api/qr-sessions?code=${code}`)
       .then(r => r.json())
-      .then(d => { if (d.name) setSessionName(d.name); })
-      .catch(() => {});
+      .then(d => {
+        if (d.name) setSessionName(d.name);
+        const qrType = d.qr_type || "inside";
+        const url = (qrType === "outside" || qrType === "scouting")
+          ? "https://bandidostrivia.com"
+          : `https://bandidostrivia.com/join/${code}`;
+        setJoinUrl(url);
+        return QRCode.toDataURL(url, {
+          width: 600,
+          margin: 2,
+          color: { dark: "#1a0a2e", light: "#ffffff" },
+          errorCorrectionLevel: "H",
+        });
+      })
+      .then(setDataUrl)
+      .catch(() => {
+        // Fallback if API fails
+        const url = `https://bandidostrivia.com/join/${code}`;
+        setJoinUrl(url);
+        QRCode.toDataURL(url, {
+          width: 600, margin: 2,
+          color: { dark: "#1a0a2e", light: "#ffffff" },
+          errorCorrectionLevel: "H",
+        }).then(setDataUrl);
+      });
   }, [code]);
 
   const handlePrint = () => window.print();

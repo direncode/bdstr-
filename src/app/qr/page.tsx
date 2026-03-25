@@ -12,7 +12,7 @@ interface QrSession {
 }
 
 const TYPE_META: Record<string, { label: string; multiplier: string; color: string; subtitle: string; cardBg: string }> = {
-  outside: { label: "Outside", multiplier: "1x", color: "#3b82f6", subtitle: "Scan to play trivia!", cardBg: "#eff6ff" },
+  outside: { label: "Outside", multiplier: "", color: "#3b82f6", subtitle: "Scan to play trivia!", cardBg: "#eff6ff" },
   inside: { label: "Inside", multiplier: "2x", color: "#22c55e", subtitle: "Scan for 2x points!", cardBg: "#f0fdf4" },
   trivia_night: { label: "Trivia Night", multiplier: "3x", color: "#a855f7", subtitle: "Scan to check in — 3x points!", cardBg: "#faf5ff" },
   scouting: { label: "Scouting", multiplier: "", color: "#f97316", subtitle: "Scan to play trivia!", cardBg: "#fff7ed" },
@@ -53,7 +53,10 @@ function QRContent() {
         const images: Record<string, string> = {};
         for (const s of active) {
           const meta = TYPE_META[s.qr_type || "inside"] || TYPE_META.inside;
-          images[s.code] = await QRCode.toDataURL(`https://bandidostrivia.com/join/${s.code}`, {
+          const qrUrl = (s.qr_type === "outside" || s.qr_type === "scouting")
+            ? "https://bandidostrivia.com"
+            : `https://bandidostrivia.com/join/${s.code}`;
+          images[s.code] = await QRCode.toDataURL(qrUrl, {
             width: 400,
             margin: 2,
             color: { dark: meta.color, light: "#ffffff" },
@@ -106,7 +109,7 @@ function QRContent() {
         </nav>
 
         <h1 className="no-print text-white text-2xl font-bold text-center mb-2">
-          {meta ? `${meta.label} QR Codes (${meta.multiplier})` : "All QR Codes"}
+          {meta ? `${meta.label} QR Codes${meta.multiplier ? ` (${meta.multiplier})` : ""}` : "All QR Codes"}
         </h1>
         <p className="no-print text-white/40 text-sm text-center mb-8">
           {meta ? `Print and place at Bandidos. ${meta.subtitle}` : "Print and place at Bandidos."}

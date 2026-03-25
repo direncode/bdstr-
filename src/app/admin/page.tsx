@@ -953,13 +953,12 @@ function AdminContent() {
         {/* ==================== QR CODES TAB ==================== */}
         {tab === "qrcodes" && (
           <>
-            {/* ---- OUTSIDE 1x ---- */}
+            {/* ---- OUTSIDE ---- */}
             <div className="bg-blue-500/10 border border-blue-500/30 backdrop-blur rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold">1x</span>
                 <h2 className="text-white font-bold text-lg">Outside — Storefront QR</h2>
               </div>
-              <p className="text-white/40 text-sm mb-4">Permanent code for the window/door. Links to the platform — players sign up and play at normal 1x points. Never gets claimed, always reusable.</p>
+              <p className="text-white/40 text-sm mb-4">Permanent code for the window/door. Links straight to the platform. Never gets claimed, always reusable.</p>
               <div className="flex gap-3 items-center">
                 <input
                   type="number"

@@ -11,7 +11,7 @@ interface QrSession {
 }
 
 const TIER_INFO: Record<string, { label: string; color: string; bg: string; border: string; desc: string }> = {
-  outside: { label: "1x Points", color: "text-blue-300", bg: "bg-blue-500/20", border: "border-blue-500/40", desc: "Welcome to Bandidos Trivia! Sign up to play." },
+  outside: { label: "Play Trivia", color: "text-blue-300", bg: "bg-blue-500/20", border: "border-blue-500/40", desc: "Welcome to Bandidos Trivia! Sign up to play." },
   inside: { label: "2x Points", color: "text-green-300", bg: "bg-green-500/20", border: "border-green-500/40", desc: "You're at Bandidos — double points on all trivia!" },
   trivia_night: { label: "3x Points", color: "text-purple-300", bg: "bg-purple-500/20", border: "border-purple-500/40", desc: "Trivia Night! Triple points on all rounds tonight." },
   scouting: { label: "Play Trivia", color: "text-orange-300", bg: "bg-orange-500/20", border: "border-orange-500/40", desc: "Welcome to Bandidos Trivia! Sign up to play." },
@@ -205,7 +205,7 @@ export default function JoinPage() {
     );
   }
 
-  // ===== SUCCESS: Outside 1x =====
+  // ===== SUCCESS: Outside =====
   if (claimed && qrType === "outside") {
     return (
       <main className="min-h-screen bg-gradient-to-b from-banditos-dark to-[#2a1a3e] flex flex-col items-center justify-center px-4">
@@ -213,9 +213,6 @@ export default function JoinPage() {
         <div className="mt-8 bg-blue-500/20 border border-blue-500/40 rounded-2xl p-8 text-center max-w-sm w-full" role="status">
           <h2 className="text-blue-300 text-2xl font-bold">Welcome to Bandidos Trivia!</h2>
           <p className="text-blue-300/70 mt-2">Play trivia, earn points, climb the leaderboard.</p>
-          <div className="mt-4 bg-blue-500/10 rounded-xl p-4">
-            <p className="text-white/80 text-sm">Come inside and scan a table QR code for <span className="text-green-300 font-bold">2x points</span></p>
-          </div>
         </div>
         <button onClick={() => router.push("/play")} className="mt-6 bg-banditos-red text-white px-8 py-3 rounded-2xl font-bold text-lg hover:bg-red-700 transition-colors">
           Play Trivia
