@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { getSession, setSession, clearSession, generateToken, hashPassword, verifyPassword } from "@/lib/session";
+import { getSession, setSession, clearSession, generateToken } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -48,14 +48,12 @@ export async function POST(req: Request) {
   // Register new user — use email prefix as display name
   const displayName = trimmedEmail.split("@")[0];
   const token = generateToken();
-  const pwHash = await hashPassword("unused");
 
   const { data: profile, error } = await supabase
     .from("profiles")
     .insert({
       email: trimmedEmail,
       display_name: displayName,
-      password_hash: pwHash,
       session_token: token,
     })
     .select()

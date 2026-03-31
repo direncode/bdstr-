@@ -7,7 +7,7 @@ create table if not exists profiles (
   id uuid default gen_random_uuid() primary key,
   email text not null unique,
   display_name text not null unique,
-  password_hash text not null,
+  password_hash text,  -- no longer used (email-only sign-in)
   session_token text,
   is_admin boolean default false,
   total_points int default 0,
