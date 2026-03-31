@@ -10,13 +10,13 @@ export async function GET() {
   return NextResponse.json({ profile });
 }
 
-// POST /api/auth — register or login (email + password)
+// POST /api/auth — sign in with email only (auto-registers if new)
 export async function POST(req: Request) {
   const supabase = await createServerSupabase();
-  const { mode, email, name, password } = await req.json();
+  const { email } = await req.json();
 
-  if (!email?.trim() || !password) {
-    return NextResponse.json({ error: "Email and password required" }, { status: 400 });
+  if (!email?.trim()) {
+    return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
 
   const trimmedEmail = email.trim().toLowerCase();
@@ -26,88 +26,47 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
   }
 
-  if (mode === "register") {
-    if (!name?.trim()) {
-      return NextResponse.json({ error: "Display name is required" }, { status: 400 });
-    }
-    if (password.length < 4) {
-      return NextResponse.json({ error: "Password must be at least 4 characters" }, { status: 400 });
-    }
+  // Check if account exists
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("email", trimmedEmail)
+    .maybeSingle();
 
-    const trimmedName = name.trim();
-
-    // Check if email is taken
-    const { data: existingEmail } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", trimmedEmail)
-      .maybeSingle();
-
-    if (existingEmail) {
-      return NextResponse.json({ error: "An account with that email already exists" }, { status: 400 });
-    }
-
-    // Check if display name is taken
-    const { data: existingName } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("display_name", trimmedName)
-      .maybeSingle();
-
-    if (existingName) {
-      return NextResponse.json({ error: "That display name is already taken" }, { status: 400 });
-    }
-
-    const token = generateToken();
-    const pwHash = await hashPassword(password);
-
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .insert({
-        email: trimmedEmail,
-        display_name: trimmedName,
-        password_hash: pwHash,
-        session_token: token,
-      })
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    await setSession(token);
-    return NextResponse.json({ profile });
-  }
-
-  if (mode === "login") {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("email", trimmedEmail)
-      .maybeSingle();
-
-    if (!profile) {
-      return NextResponse.json({ error: "No account with that email" }, { status: 400 });
-    }
-
-    const valid = await verifyPassword(password, profile.password_hash);
-    if (!valid) {
-      return NextResponse.json({ error: "Wrong password" }, { status: 400 });
-    }
-
-    // Refresh session token
+  if (existing) {
+    // Log in existing user
     const token = generateToken();
     await supabase
       .from("profiles")
       .update({ session_token: token })
-      .eq("id", profile.id);
+      .eq("id", existing.id);
 
     await setSession(token);
-    return NextResponse.json({ profile });
+    return NextResponse.json({ profile: existing });
   }
 
-  return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+  // Register new user — use email prefix as display name
+  const displayName = trimmedEmail.split("@")[0];
+  const token = generateToken();
+  const pwHash = await hashPassword("unused");
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .insert({
+      email: trimmedEmail,
+      display_name: displayName,
+      password_hash: pwHash,
+      session_token: token,
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  await setSession(token);
+  return NextResponse.json({ profile });
 }
 
 // DELETE /api/auth — sign out

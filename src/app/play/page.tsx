@@ -27,10 +27,7 @@ export default function PlayPage() {
   const [hasQrBonus, setHasQrBonus] = useState(false);
 
   // Auth
-  const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [authEmail, setAuthEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -89,7 +86,7 @@ export default function PlayPage() {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: authMode === "register" ? "register" : "login", email: authEmail.trim(), name: displayName.trim(), password }),
+        body: JSON.stringify({ email: authEmail.trim() }),
       });
       const data = await res.json();
       if (data.error) { setAuthError(data.error); setAuthLoading(false); return; }
@@ -153,17 +150,6 @@ export default function PlayPage() {
         )}
 
         <div className="mt-4 w-full max-w-sm bg-white/10 backdrop-blur rounded-2xl p-6">
-          <div className="flex gap-2 mb-6" role="tablist" aria-label="Login or register">
-            <button onClick={() => setAuthMode("register")} role="tab" aria-selected={authMode === "register"}
-              className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "register" ? "bg-banditos-red text-white" : "text-white/60"}`}>
-              New Player
-            </button>
-            <button onClick={() => setAuthMode("login")} role="tab" aria-selected={authMode === "login"}
-              className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${authMode === "login" ? "bg-banditos-red text-white" : "text-white/60"}`}>
-              Returning
-            </button>
-          </div>
-
           {authError && <p className="text-red-400 text-sm mb-3 text-center" role="alert">{authError}</p>}
 
           <form onSubmit={handleAuth} className="space-y-3">
@@ -173,23 +159,9 @@ export default function PlayPage() {
                 placeholder="Email" autoFocus required
                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none text-lg" />
             </div>
-            {authMode === "register" && (
-              <div>
-                <label htmlFor="auth-name" className="sr-only">Display name</label>
-                <input id="auth-name" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Display name (shown on leaderboard)" required
-                  className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
-              </div>
-            )}
-            <div>
-              <label htmlFor="auth-password" className="sr-only">Password</label>
-              <input id="auth-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password" required minLength={4}
-                className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/40 border border-white/20 focus:border-banditos-gold outline-none" />
-            </div>
-            <button type="submit" disabled={authLoading || !authEmail.trim() || (authMode === "register" && !displayName.trim())}
+            <button type="submit" disabled={authLoading || !authEmail.trim()}
               className="w-full bg-banditos-red text-white py-3 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors disabled:opacity-50">
-              {authLoading ? "Loading..." : authMode === "register" ? "JOIN" : "LOG IN"}
+              {authLoading ? "Loading..." : "SIGN IN"}
             </button>
           </form>
         </div>
